@@ -16,8 +16,8 @@ st.markdown("""
 st.sidebar.title("🛠️ قائمة الأدوات")
 tool_choice = st.sidebar.radio("اختر الأداة", [
     "📦 حاسبة التجارة الإلكترونية",
-    "💸 حاسبة الرواتب (جديد)",
-    "📅 حاسبة أيام الدوام (جديد)",
+    "💸 حاسبة الرواتب",
+    "📅 حاسبة الدوام الدقيقة (مُحدث)",
     "⚖️ توزيع مصاريف الشحن",
     "🏷️ حاسبة الخصومات",
     "⏳ حاسبة العمر",
@@ -59,9 +59,9 @@ if tool_choice == "📦 حاسبة التجارة الإلكترونية":
     res_col3.metric(label="الربح الصافي", value=f"{net_profit:.2f}", delta="ربح" if net_profit > 0 else "خسارة")
 
 # ==========================================
-# 2. حاسبة الرواتب السريعة (جديد)
+# 2. حاسبة الرواتب السريعة
 # ==========================================
-elif tool_choice == "💸 حاسبة الرواتب (جديد)":
+elif tool_choice == "💸 حاسبة الرواتب":
     st.title("💸 حاسبة الرواتب السريعة")
     st.write("احسب الراتب الصافي للموظف بعد إضافة البدلات وخصم الغيابات أو السلف بثانية واحدة.")
     
@@ -79,34 +79,52 @@ elif tool_choice == "💸 حاسبة الرواتب (جديد)":
     st.metric(label="💰 الراتب المستحق الدفع (الصافي)", value=f"{net_salary:.2f}")
 
 # ==========================================
-# 3. حاسبة أيام الدوام والراتب (جديد)
+# 3. حاسبة أيام الدوام والراتب بدقة متناهية (محدثة)
 # ==========================================
-elif tool_choice == "📅 حاسبة أيام الدوام (جديد)":
-    st.title("📅 حاسبة أيام الدوام والراتب")
-    st.write("احسب عدد أيام العمل الفعلية بين تاريخين، واعرف الراتب المستحق بناءً عليها (باعتبار الشهر 30 يوماً).")
+elif tool_choice == "📅 حاسبة الدوام الدقيقة (مُحدث)":
+    st.title("📅 حاسبة الدوام والراتب الدقيقة")
+    st.write("احسب المدة الفعلية للدوام (بالأيام، الساعات، الدقائق، والثواني) والراتب المستحق عليها بدقة متناهية.")
     
     monthly_salary = st.number_input("الراتب الشهري الكامل للموظف:", min_value=0.0, value=500.0)
     
+    st.divider()
     col1, col2 = st.columns(2)
     with col1:
-        # افتراضياً: بداية الشهر الحالي
-        start_date = st.date_input("تاريخ بداية الدوام:", value=datetime.date.today().replace(day=1))
+        st.write("🟢 **بداية الدوام:**")
+        start_date = st.date_input("تاريخ البداية:", value=datetime.date.today().replace(day=1))
+        start_time = st.time_input("وقت البداية (ساعة:دقيقة):", value=datetime.time(8, 0, 0), step=60)
     with col2:
-        end_date = st.date_input("تاريخ آخر يوم دوام:", value=datetime.date.today())
+        st.write("🔴 **نهاية الدوام:**")
+        end_date = st.date_input("تاريخ النهاية:", value=datetime.date.today())
+        end_time = st.time_input("وقت النهاية (ساعة:دقيقة):", value=datetime.time(16, 0, 0), step=60)
         
+    start_datetime = datetime.datetime.combine(start_date, start_time)
+    end_datetime = datetime.datetime.combine(end_date, end_time)
+    
     st.divider()
-    if start_date <= end_date:
-        # حساب عدد الأيام (نضيف 1 لشمول اليوم الأخير)
-        total_days = (end_date - start_date).days + 1
-        daily_rate = monthly_salary / 30
-        earned_salary = total_days * daily_rate
+    if start_datetime < end_datetime:
+        time_diff = end_datetime - start_datetime
+        total_seconds = time_diff.total_seconds()
         
-        c1, c2, c3 = st.columns(3)
-        c1.metric(label="عدد الأيام", value=f"{total_days} يوم")
-        c2.metric(label="أجرة اليوم الواحد", value=f"{daily_rate:.2f}")
-        c3.metric(label="الراتب المستحق للأيام", value=f"{earned_salary:.2f}")
+        # استخراج الأيام والساعات والدقائق والثواني
+        days = time_diff.days
+        hours, remainder = divmod(time_diff.seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        
+        # حساب الراتب بناءً على الثواني (الشهر 30 يوم = 2,592,000 ثانية)
+        total_month_seconds = 30 * 24 * 3600
+        earned_salary = (total_seconds / total_month_seconds) * monthly_salary
+        
+        st.subheader("⏱️ المدة الفعلية المقضية:")
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric(label="أيام", value=days)
+        c2.metric(label="ساعات", value=hours)
+        c3.metric(label="دقائق", value=minutes)
+        c4.metric(label="ثواني", value=seconds)
+        
+        st.success(f"💰 الراتب المستحق لهذه المدة بدقة: **{earned_salary:.2f}**")
     else:
-        st.error("تاريخ النهاية يجب أن يكون بعد تاريخ البداية!")
+        st.error("تأكد أن تاريخ ووقت النهاية يجب أن يكون بعد البداية!")
 
 # ==========================================
 # 4. حاسبة توزيع مصاريف الشحن
