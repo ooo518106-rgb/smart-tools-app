@@ -3,37 +3,12 @@ import streamlit as st
 # إعدادات الصفحة الأساسية
 st.set_page_config(page_title="أدوات التاجر الذكي", page_icon="💰", layout="centered")
 
-# ==========================================
-# أكواد التصميم (CSS) لتحسين الشكل ودعم العربية
-# ==========================================
+# إخفاء علامات Streamlit فقط (بدون التدخل في اتجاه الصفحة لضمان عمل الجوال)
 st.markdown("""
 <style>
-    /* جعل الموقع من اليمين لليسار */
-    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
-    html, body, [class*="css"] {
-        font-family: 'Tajawal', sans-serif;
-        direction: rtl;
-        text-align: right;
-    }
-    
-    /* إخفاء علامات Streamlit المائية لتصميم أكثر احترافية */
     #MainMenu {visibility: hidden;}
     header {visibility: hidden;}
     footer {visibility: hidden;}
-    
-    /* تجميل شكل الأزرار */
-    .stButton>button {
-        background-color: #2e8b57;
-        color: white;
-        border-radius: 8px;
-        border: none;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        transition: 0.3s;
-    }
-    .stButton>button:hover {
-        background-color: #1e5c3a;
-        transform: translateY(-2px);
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -54,18 +29,17 @@ tool_choice = st.sidebar.radio("اختر الأداة:", [
 # ==========================================
 if tool_choice == "📦 حاسبة التجارة الإلكترونية":
     st.title("📦 حاسبة أرباح التجارة الإلكترونية")
-    st.markdown("<p style='color: gray;'>احسب هوامش الربح الصافية بعد خصم تكاليف الشحن ورسوم بوابات الدفع.</p>", unsafe_allow_html=True)
+    st.write("احسب هوامش الربح الصافية بعد خصم تكاليف الشحن ورسوم بوابات الدفع.")
     
-    with st.container():
-        col1, col2 = st.columns(2)
-        with col1:
-            cost_price = st.number_input("تكلفة المنتج من المورد:", min_value=0.0, value=50.0)
-            shipping_cost = st.number_input("تكلفة الشحن والتغليف:", min_value=0.0, value=15.0)
-        with col2:
-            selling_price = st.number_input("سعر البيع للعميل:", min_value=0.0, value=150.0)
-            gateway_fee_percent = st.number_input("رسوم بوابة الدفع (%):", min_value=0.0, value=2.2)
-            
-        fixed_fee = st.number_input("الرسوم الثابتة للعملية:", min_value=0.0, value=1.0)
+    col1, col2 = st.columns(2)
+    with col1:
+        cost_price = st.number_input("تكلفة المنتج من المورد:", min_value=0.0, value=50.0)
+        shipping_cost = st.number_input("تكلفة الشحن والتغليف:", min_value=0.0, value=15.0)
+    with col2:
+        selling_price = st.number_input("سعر البيع للعميل:", min_value=0.0, value=150.0)
+        gateway_fee_percent = st.number_input("رسوم بوابة الدفع (%):", min_value=0.0, value=2.2)
+        
+    fixed_fee = st.number_input("الرسوم الثابتة للعملية:", min_value=0.0, value=1.0)
     
     total_item_cost = cost_price + shipping_cost
     payment_gateway_fees = (selling_price * (gateway_fee_percent / 100)) + fixed_fee
@@ -74,18 +48,17 @@ if tool_choice == "📦 حاسبة التجارة الإلكترونية":
     st.divider()
     st.subheader("📊 ملخص الأرباح")
     
-    # استخدام شكل العدادات (Metrics) بدلاً من النصوص العادية
     res_col1, res_col2, res_col3 = st.columns(3)
     res_col1.metric(label="التكلفة الإجمالية", value=f"{total_item_cost:.2f}")
     res_col2.metric(label="رسوم الدفع", value=f"{payment_gateway_fees:.2f}")
-    res_col3.metric(label="الربح الصافي", value=f"{net_profit:.2f}", delta="مربح" if net_profit > 0 else "خسارة")
+    res_col3.metric(label="الربح الصافي", value=f"{net_profit:.2f}", delta="ربح" if net_profit > 0 else "خسارة")
 
 # ==========================================
-# 2. حاسبة نقطة التعادل (للتجار والمحاسبين)
+# 2. حاسبة نقطة التعادل
 # ==========================================
 elif tool_choice == "📉 حاسبة نقطة التعادل":
     st.title("📉 حاسبة نقطة التعادل (Break-Even)")
-    st.markdown("<p style='color: gray;'>اعرف كم قطعة تحتاج أن تبيع لتغطية مصاريفك الثابتة (مثل الإيجار والاشتراكات) والبدء في تحقيق الأرباح.</p>", unsafe_allow_html=True)
+    st.write("اعرف كم قطعة تحتاج أن تبيع لتغطية مصاريفك الثابتة والبدء في تحقيق الأرباح.")
     
     fixed_costs = st.number_input("إجمالي المصاريف الثابتة (شهرياً):", min_value=0.0, value=1000.0)
     col1, col2 = st.columns(2)
@@ -101,7 +74,7 @@ elif tool_choice == "📉 حاسبة نقطة التعادل":
         
         c1, c2 = st.columns(2)
         c1.metric(label="القطع المطلوبة للتعادل", value=f"{break_even_units:.0f} قطعة")
-        c2.metric(label="المبيعات المطلوبة للتعادل", value=f"{break_even_revenue:.2f}")
+        c2.metric(label="المبيعات المطلوبة", value=f"{break_even_revenue:.2f}")
     else:
         st.error("سعر البيع يجب أن يكون أعلى من تكلفة القطعة لكي يكون هناك نقطة تعادل!")
 
@@ -110,7 +83,7 @@ elif tool_choice == "📉 حاسبة نقطة التعادل":
 # ==========================================
 elif tool_choice == "🧾 حاسبة الضريبة VAT":
     st.title("🧾 حاسبة ضريبة القيمة المضافة (VAT)")
-    st.markdown("<p style='color: gray;'>أداة سريعة لحساب الضريبة للسوق الخليجي (إضافة الضريبة أو استخراجها).</p>", unsafe_allow_html=True)
+    st.write("أداة سريعة لحساب الضريبة للسوق الخليجي (إضافة الضريبة أو استخراجها).")
     
     price = st.number_input("المبلغ:", min_value=0.0, value=1000.0)
     vat_rate = st.number_input("نسبة الضريبة (%):", min_value=0.0, value=15.0)
@@ -123,19 +96,19 @@ elif tool_choice == "🧾 حاسبة الضريبة VAT":
         vat_amount = price * (vat_rate / 100)
         total_price = price + vat_amount
         res1.metric(label="قيمة الضريبة", value=f"{vat_amount:.2f}")
-        res2.metric(label="المبلغ الإجمالي (شامل الضريبة)", value=f"{total_price:.2f}")
+        res2.metric(label="المبلغ الإجمالي", value=f"{total_price:.2f}")
     else:
         base_price = price / (1 + (vat_rate / 100))
         vat_amount = price - base_price
-        res1.metric(label="المبلغ الأساسي (قبل الضريبة)", value=f"{base_price:.2f}")
-        res2.metric(label="قيمة الضريبة المستقطعة", value=f"{vat_amount:.2f}")
+        res1.metric(label="المبلغ الأساسي", value=f"{base_price:.2f}")
+        res2.metric(label="الضريبة المستقطعة", value=f"{vat_amount:.2f}")
 
 # ==========================================
 # 4. حاسبة أرباح الكريبتو
 # ==========================================
 elif tool_choice == "📈 حاسبة أرباح الكريبتو":
     st.title("📈 حاسبة أرباح التداول والعملات الرقمية")
-    st.markdown("<p style='color: gray;'>احسب أرباحك الصافية بعد خصم عمولات منصات التداول.</p>", unsafe_allow_html=True)
+    st.write("احسب أرباحك الصافية بعد خصم عمولات منصات التداول.")
     
     col_a, col_b = st.columns(2)
     with col_a:
@@ -165,7 +138,7 @@ elif tool_choice == "📈 حاسبة أرباح الكريبتو":
 # ==========================================
 elif tool_choice == "🛡️ حاسبة إدارة المخاطر":
     st.title("🛡️ حاسبة إدارة المخاطر (Position Sizing)")
-    st.markdown("<p style='color: gray;'>اعرف حجم الكمية المناسبة للشراء بناءً على نسبة المخاطرة التي تتحملها في محفظتك.</p>", unsafe_allow_html=True)
+    st.write("اعرف حجم الكمية المناسبة للشراء بناءً على نسبة المخاطرة التي تتحملها في محفظتك.")
     
     capital = st.number_input("حجم المحفظة الإجمالي (USDT):", min_value=0.0, value=1000.0)
     risk_percent = st.number_input("المخاطرة المسموحة للصفقة (%):", min_value=0.0, value=2.0)
@@ -184,8 +157,8 @@ elif tool_choice == "🛡️ حاسبة إدارة المخاطر":
         
         st.info(f"المبلغ المعرض للمخاطرة (في حال ضرب الوقف): **{risk_amount:.2f} USDT**")
         p1, p2 = st.columns(2)
-        p1.metric(label="الكمية المسموح شراؤها (حبة)", value=f"{position_size:.4f}")
-        p2.metric(label="حجم الصفقة بالدولار", value=f"{position_value:.2f} USDT")
+        p1.metric(label="الكمية المسموح شراؤها", value=f"{position_size:.4f}")
+        p2.metric(label="حجم الصفقة", value=f"{position_value:.2f} USDT")
     else:
         st.warning("يرجى إدخال أسعار دخول ووقف خسارة صحيحة ومختلفة.")
 
@@ -194,7 +167,7 @@ elif tool_choice == "🛡️ حاسبة إدارة المخاطر":
 # ==========================================
 elif tool_choice == "📄 القوالب الجاهزة (مجاناً)":
     st.title("📄 قوالب محاسبية وتجارية جاهزة")
-    st.markdown("<p style='color: gray;'>نماذج مصممة لتسهيل ترحيل أرصدتك وتكاليفك إلى نظامك المحاسبي.</p>", unsafe_allow_html=True)
+    st.write("نماذج مصممة لتسهيل ترحيل أرصدتك وتكاليفك إلى نظامك المحاسبي.")
     
     st.info("💡 حمل القوالب مجاناً وافتحها باستخدام Excel أو Word.")
     
