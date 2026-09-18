@@ -1,9 +1,10 @@
 import streamlit as st
+import datetime
 
 # إعدادات الصفحة الأساسية
 st.set_page_config(page_title="أدوات التاجر الذكي", page_icon="💰", layout="centered")
 
-# CSS آمن: يخفي الفوتر النصي فقط ويحافظ على شريط القائمة الجانبية
+# CSS آمن: يخفي الفوتر النصي فقط ويحافظ على شريط القائمة الجانبية ليعمل على الجوال
 st.markdown("""
 <style>
     footer {visibility: hidden;}
@@ -15,6 +16,9 @@ st.markdown("""
 st.sidebar.title("🛠️ قائمة الأدوات")
 tool_choice = st.sidebar.radio("اختر الأداة", [
     "📦 حاسبة التجارة الإلكترونية",
+    "⚖️ توزيع مصاريف الشحن (جديد)",
+    "🏷️ حاسبة الخصومات (جديد)",
+    "⏳ حاسبة العمر (جديد)",
     "📉 حاسبة نقطة التعادل",
     "🧾 حاسبة الضريبة VAT",
     "📈 حاسبة أرباح الكريبتو",
@@ -53,7 +57,81 @@ if tool_choice == "📦 حاسبة التجارة الإلكترونية":
     res_col3.metric(label="الربح الصافي", value=f"{net_profit:.2f}", delta="ربح" if net_profit > 0 else "خسارة")
 
 # ==========================================
-# 2. حاسبة نقطة التعادل
+# 2. حاسبة توزيع مصاريف الشحن (جديد)
+# ==========================================
+elif tool_choice == "⚖️ توزيع مصاريف الشحن (جديد)":
+    st.title("⚖️ حاسبة توزيع مصاريف الشحن والجمارك")
+    st.write("أداة محاسبية لتوزيع المصاريف الإضافية على الأصناف لمعرفة التكلفة الحقيقية للقطعة الواحدة")
+    
+    total_invoice = st.number_input("إجمالي قيمة الفاتورة (لجميع البضائع):", min_value=1.0, value=1000.0)
+    total_expenses = st.number_input("إجمالي مصاريف الشحن والجمارك:", min_value=0.0, value=200.0)
+    item_price = st.number_input("سعر شراء الصنف الواحد (من المورد):", min_value=0.0, value=50.0)
+    
+    st.divider()
+    if total_invoice > 0:
+        expense_ratio = total_expenses / total_invoice
+        item_expense = item_price * expense_ratio
+        final_item_cost = item_price + item_expense
+        
+        c1, c2 = st.columns(2)
+        c1.metric(label="نصيب القطعة من المصاريف", value=f"{item_expense:.2f}")
+        c2.metric(label="التكلفة النهائية للقطعة", value=f"{final_item_cost:.2f}")
+        st.info("💡 يمكنك الآن إدخال 'التكلفة النهائية' مباشرة في نظامك المحاسبي لتسعير أدق.")
+
+# ==========================================
+# 3. حاسبة الخصومات (جديد)
+# ==========================================
+elif tool_choice == "🏷️ حاسبة الخصومات (جديد)":
+    st.title("🏷️ حاسبة الخصومات والعروض")
+    st.write("احسب السعر النهائي للمنتج بعد تطبيق الخصم التجاري")
+    
+    price_before = st.number_input("السعر الأساسي:", min_value=0.0, value=100.0)
+    discount_type = st.radio("نوع الخصم:", ["نسبة مئوية (%)", "مبلغ ثابت"])
+    
+    if discount_type == "نسبة مئوية (%)":
+        disc_percent = st.number_input("نسبة الخصم (%):", min_value=0.0, max_value=100.0, value=20.0)
+        disc_amount = price_before * (disc_percent / 100)
+    else:
+        disc_amount = st.number_input("مبلغ الخصم:", min_value=0.0, max_value=price_before, value=20.0)
+        
+    price_after = price_before - disc_amount
+    
+    st.divider()
+    c1, c2 = st.columns(2)
+    c1.metric(label="قيمة التوفير (الخصم)", value=f"{disc_amount:.2f}")
+    c2.metric(label="السعر النهائي للعميل", value=f"{price_after:.2f}")
+
+# ==========================================
+# 4. حاسبة العمر (جديد)
+# ==========================================
+elif tool_choice == "⏳ حاسبة العمر (جديد)":
+    st.title("⏳ حاسبة العمر الدقيقة")
+    st.write("أدخل تاريخ ميلادك لمعرفة عمرك بالتفصيل (سنوات، أشهر، أيام)")
+    
+    today = datetime.date.today()
+    dob = st.date_input("تاريخ الميلاد:", min_value=datetime.date(1900, 1, 1), max_value=today, value=datetime.date(2000, 1, 1))
+    
+    years = today.year - dob.year
+    months = today.month - dob.month
+    days = today.day - dob.day
+    
+    if days < 0:
+        months -= 1
+        days += 30 # تقريب لعدد أيام الشهر
+    if months < 0:
+        years -= 1
+        months += 12
+        
+    st.divider()
+    st.subheader("عمرك الآن هو:")
+    
+    c1, c2, c3 = st.columns(3)
+    c1.metric(label="سنة", value=years)
+    c2.metric(label="شهر", value=months)
+    c3.metric(label="يوم", value=days)
+
+# ==========================================
+# 5. حاسبة نقطة التعادل
 # ==========================================
 elif tool_choice == "📉 حاسبة نقطة التعادل":
     st.title("📉 حاسبة نقطة التعادل (Break-Even)")
@@ -78,7 +156,7 @@ elif tool_choice == "📉 حاسبة نقطة التعادل":
         st.error("سعر البيع يجب أن يكون أعلى من تكلفة القطعة لكي يكون هناك نقطة تعادل")
 
 # ==========================================
-# 3. حاسبة ضريبة القيمة المضافة (VAT)
+# 6. حاسبة ضريبة القيمة المضافة (VAT)
 # ==========================================
 elif tool_choice == "🧾 حاسبة الضريبة VAT":
     st.title("🧾 حاسبة ضريبة القيمة المضافة (VAT)")
@@ -103,7 +181,7 @@ elif tool_choice == "🧾 حاسبة الضريبة VAT":
         res2.metric(label="الضريبة المستقطعة", value=f"{vat_amount:.2f}")
 
 # ==========================================
-# 4. حاسبة أرباح الكريبتو
+# 7. حاسبة أرباح الكريبتو
 # ==========================================
 elif tool_choice == "📈 حاسبة أرباح الكريبتو":
     st.title("📈 حاسبة أرباح التداول والعملات الرقمية")
@@ -133,7 +211,7 @@ elif tool_choice == "📈 حاسبة أرباح الكريبتو":
     cr3.metric(label="الربح الصافي", value=f"{net_crypto_profit:.2f}", delta="ربح" if net_crypto_profit > 0 else "خسارة")
 
 # ==========================================
-# 5. حاسبة إدارة المخاطر للكريبتو
+# 8. حاسبة إدارة المخاطر للكريبتو
 # ==========================================
 elif tool_choice == "🛡️ حاسبة إدارة المخاطر":
     st.title("🛡️ حاسبة إدارة المخاطر (Position Sizing)")
@@ -162,7 +240,7 @@ elif tool_choice == "🛡️ حاسبة إدارة المخاطر":
         st.warning("يرجى إدخال أسعار دخول ووقف خسارة صحيحة ومختلفة")
 
 # ==========================================
-# 6. القوالب الجاهزة
+# 9. القوالب الجاهزة
 # ==========================================
 elif tool_choice == "📄 القوالب الجاهزة (مجاناً)":
     st.title("📄 قوالب محاسبية وتجارية جاهزة")
@@ -179,7 +257,7 @@ elif tool_choice == "📄 القوالب الجاهزة (مجاناً)":
         st.download_button("📥 تحميل نموذج الجرد", "عينة", "inventory.txt")
 
 # ==========================================
-# 7. سياسة الخصوصية
+# 10. سياسة الخصوصية
 # ==========================================
 elif tool_choice == "📜 سياسة الخصوصية":
     st.title("📜 سياسة الخصوصية وإخلاء المسؤولية")
