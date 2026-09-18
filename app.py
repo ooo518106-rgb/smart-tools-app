@@ -4,140 +4,51 @@ import pandas as pd
 import urllib.parse
 
 # إعدادات الصفحة الأساسية
-st.set_page_config(page_title="أدوات التاجر الذكي", page_icon="💼", layout="centered")
+st.set_page_config(page_title="أدوات التاجر الذكي", page_icon="💰", layout="centered")
 
 # ==========================================
-# التصميم الشامل (CSS) - تصميم البطاقات والتطبيق
+# CSS آمن: تحسين الخطوط والأزرار بدون كسر تخطيط الشاشة
 # ==========================================
 st.markdown("""
 <style>
-    /* الخطوط والخلفية الأساسية */
+    /* تحسين الخطوط */
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap');
-    
     html, body, [class*="css"] {
         font-family: 'Tajawal', sans-serif !important;
-        direction: rtl !important;
-        text-align: right !important;
-    }
-    
-    /* خلفية التطبيق رمادي فاتح مريح */
-    .stApp {
-        background-color: #f4f6f9;
     }
 
-    /* إخفاء علامات Streamlit */
-    footer, header, #MainMenu, [data-testid="stToolbar"] {
-        visibility: hidden !important;
-        display: none !important;
-    }
+    /* إخفاء العلامات والزر الأحمر بأمان */
+    #MainMenu, footer, header {visibility: hidden !important;}
+    [data-testid="stAppDeployButton"] {display: none !important;}
 
-    /* تصميم البطاقات البيضاء البارزة */
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-    }
-    div[data-testid="stVerticalBlock"] > div {
-        background-color: white;
-        border-radius: 12px;
-        padding: 20px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-        margin-bottom: 15px;
-    }
-    
-    /* منع تأثير البطاقة على القائمة الجانبية */
-    section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] > div {
-        background-color: transparent;
-        box-shadow: none;
-        padding: 0;
-    }
-
-    /* القائمة الجانبية - لون داكن احترافي */
-    section[data-testid="stSidebar"] {
-        background-color: #1a252f;
-    }
-    section[data-testid="stSidebar"] * {
-        color: #ecf0f1 !important;
-    }
-    div[data-testid="stRadio"] > label {
-        font-weight: bold;
-        color: #bdc3c7 !important;
-        margin-bottom: 10px;
-    }
-    div[role="radiogroup"] label {
-        background-color: #2c3e50;
-        padding: 10px;
-        border-radius: 8px;
-        transition: 0.2s;
-        margin-bottom: 5px;
-    }
-    div[role="radiogroup"] label:hover {
-        background-color: #34495e;
-    }
-
-    /* تصميم حقول الإدخال (Inputs) */
-    .stNumberInput input, .stTextInput input, .stDateInput input, .stTimeInput input {
-        border-radius: 8px !important;
-        border: 1px solid #dcdde1 !important;
-        padding: 10px !important;
-        font-size: 16px !important;
-        background-color: #f8f9fa !important;
-    }
-    .stNumberInput input:focus, .stTextInput input:focus {
-        border-color: #3498db !important;
-        box-shadow: 0 0 5px rgba(52, 152, 219, 0.3) !important;
-    }
-
-    /* تصميم الأزرار (Buttons) */
+    /* تلوين الأزرار الأساسية بالأخضر */
     .stButton>button {
         background-color: #27ae60 !important;
         color: white !important;
         border-radius: 8px !important;
-        border: none !important;
-        padding: 10px 20px !important;
         font-weight: bold !important;
-        box-shadow: 0 4px 6px rgba(39, 174, 96, 0.2) !important;
-        transition: 0.3s !important;
-        width: 100%;
+        border: none !important;
     }
     .stButton>button:hover {
         background-color: #219a52 !important;
-        transform: translateY(-2px) !important;
     }
     
-    /* تصميم العدادات (Metrics) لتبدو كداشبورد */
-    div[data-testid="metric-container"] {
-        background-color: #f1f2f6;
-        border-left: 5px solid #3498db;
-        padding: 15px;
-        border-radius: 8px;
-    }
-    div[data-testid="metric-container"] label {
-        color: #7f8fa6 !important;
-        font-weight: bold;
-    }
-    div[data-testid="metric-container"] div[data-testid="stMetricValue"] {
-        color: #2f3640 !important;
-        font-size: 24px !important;
-    }
-
-    /* العناوين */
-    h1, h2, h3 {
-        color: #2c3e50 !important;
-        border-bottom: 2px solid #3498db;
-        padding-bottom: 10px;
-        margin-bottom: 20px;
+    /* ضبط اتجاه النصوص الرئيسية لليمين */
+    .stMarkdown, .stText, label {
+        direction: rtl !important;
+        text-align: right !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- تهيئة ذاكرة الحفظ (Session State) لحاسبة التجارة ---
+# --- تهيئة ذاكرة الحفظ ---
 if 'ecommerce_history' not in st.session_state:
     st.session_state.ecommerce_history = []
 
 # القائمة الجانبية
 st.sidebar.title("🛠️ قائمة الأدوات")
-tool_choice = st.sidebar.radio("", [
-    "📦 حاسبة التجارة الإلكترونية (مع الذاكرة)",
+tool_choice = st.sidebar.radio("اختر الأداة", [
+    "📦 حاسبة التجارة الإلكترونية",
     "💳 رسوم تابي وتمارا",
     "💬 صانع روابط واتساب",
     "🏦 حاسبة القروض والأقساط",
@@ -156,9 +67,9 @@ tool_choice = st.sidebar.radio("", [
 ])
 
 # ==========================================
-# 1. حاسبة التجارة الإلكترونية (مع ميزة الذاكرة)
+# 1. حاسبة التجارة الإلكترونية
 # ==========================================
-if tool_choice == "📦 حاسبة التجارة الإلكترونية (مع الذاكرة)":
+if tool_choice == "📦 حاسبة التجارة الإلكترونية":
     st.title("📦 حاسبة أرباح التجارة الإلكترونية")
     st.write("احسب هوامش الربح الصافية بعد خصم تكاليف الشحن ورسوم بوابات الدفع")
     
@@ -176,14 +87,16 @@ if tool_choice == "📦 حاسبة التجارة الإلكترونية (مع �
     payment_gateway_fees = (selling_price * (gateway_fee_percent / 100)) + fixed_fee
     net_profit = selling_price - total_item_cost - payment_gateway_fees
     
+    st.divider()
     st.subheader("📊 ملخص الأرباح")
     res_col1, res_col2, res_col3 = st.columns(3)
     res_col1.metric("التكلفة الإجمالية", f"{total_item_cost:.2f}")
     res_col2.metric("رسوم الدفع", f"{payment_gateway_fees:.2f}")
     res_col3.metric("الربح الصافي", f"{net_profit:.2f}", delta="ربح" if net_profit > 0 else "خسارة")
 
+    st.divider()
     st.subheader("💾 سجل الحسابات (ميزة الذاكرة)")
-    product_name = st.text_input("اسم المنتج (اختياري):", placeholder="مثال: سماعة بلوتوث")
+    product_name = st.text_input("اسم المنتج (اختياري لحفظ النتيجة):")
     
     if st.button("➕ حفظ النتيجة في السجل"):
         record = {
@@ -194,7 +107,7 @@ if tool_choice == "📦 حاسبة التجارة الإلكترونية (مع �
             "الربح": round(net_profit, 2)
         }
         st.session_state.ecommerce_history.append(record)
-        st.success(f"تم حفظ '{record['المنتج']}'!")
+        st.success(f"تم الحفظ بنجاح!")
         
     if len(st.session_state.ecommerce_history) > 0:
         df_history = pd.DataFrame(st.session_state.ecommerce_history)
@@ -203,17 +116,17 @@ if tool_choice == "📦 حاسبة التجارة الإلكترونية (مع �
         
         c_btn1, c_btn2 = st.columns(2)
         with c_btn1:
-            st.download_button("📥 تحميل السجل (Excel)", csv_data, "Ecommerce.csv", "text/csv")
+            st.download_button("📥 تحميل السجل", csv_data, "Ecommerce.csv", "text/csv")
         with c_btn2:
             if st.button("🗑️ مسح السجل"):
                 st.session_state.ecommerce_history = []
                 st.rerun()
 
 # ==========================================
-# 2. حاسبة رسوم تابي وتمارا
+# 2. رسوم تابي وتمارا
 # ==========================================
 elif tool_choice == "💳 رسوم تابي وتمارا":
-    st.title("💳 حاسبة رسوم الدفع الآجل (تابي/تمارا)")
+    st.title("💳 حاسبة رسوم الدفع الآجل")
     price = st.number_input("سعر المنتج للعميل:", min_value=0.0, value=100.0)
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -228,9 +141,10 @@ elif tool_choice == "💳 رسوم تابي وتمارا":
     total_deduction = fee_amount + vat_amount
     net_to_merchant = price - total_deduction
     
+    st.divider()
     c1, c2, c3 = st.columns(3)
-    c1.metric("إجمالي رسوم الشركة", f"{fee_amount:.2f}")
-    c2.metric("الضريبة على الرسوم", f"{vat_amount:.2f}")
+    c1.metric("رسوم الشركة", f"{fee_amount:.2f}")
+    c2.metric("الضريبة", f"{vat_amount:.2f}")
     c3.metric("الخصم الكلي", f"{total_deduction:.2f}")
     st.success(f"💰 الصافي للتاجر: **{net_to_merchant:.2f}**")
 
@@ -238,22 +152,22 @@ elif tool_choice == "💳 رسوم تابي وتمارا":
 # 3. صانع روابط واتساب
 # ==========================================
 elif tool_choice == "💬 صانع روابط واتساب":
-    st.title("💬 صانع روابط واتساب المباشرة")
+    st.title("💬 صانع روابط واتساب")
     phone = st.text_input("رقم الجوال (بدون +):", placeholder="966500000000")
-    msg = st.text_area("الرسالة الترحيبية:", placeholder="مرحباً...")
+    msg = st.text_area("الرسالة الترحيبية:")
     
     if st.button("🔗 توليد الرابط"):
         if phone:
             encoded_msg = urllib.parse.quote(msg)
             wa_link = f"https://wa.me/{phone}?text={encoded_msg}"
-            st.success("تم إنشاء الرابط!")
+            st.success("تم الإنشاء!")
             st.code(wa_link, language="")
-            st.markdown(f"[📲 اضغط لتجربة الرابط]({wa_link})")
+            st.markdown(f"[📲 اضغط هنا لتجربة الرابط]({wa_link})")
         else:
             st.error("أدخل رقم الجوال أولاً.")
 
 # ==========================================
-# 4. حاسبة القروض والأقساط
+# 4. القروض والأقساط
 # ==========================================
 elif tool_choice == "🏦 حاسبة القروض والأقساط":
     st.title("🏦 حاسبة القروض والأقساط")
@@ -271,31 +185,32 @@ elif tool_choice == "🏦 حاسبة القروض والأقساط":
         monthly_payment = loan_amount / months
         
     total_paid = monthly_payment * months
-    total_interest = total_paid - loan_amount
-    
+    st.divider()
     c1, c2 = st.columns(2)
     c1.metric("القسط الشهري", f"{monthly_payment:.2f}")
-    c2.metric("إجمالي الفوائد", f"{total_interest:.2f}")
+    c2.metric("إجمالي الفوائد", f"{(total_paid - loan_amount):.2f}")
 
 # ==========================================
-# 5. حاسبة زكاة المال
+# 5. زكاة المال
 # ==========================================
 elif tool_choice == "🕋 حاسبة زكاة المال":
     st.title("🕋 حاسبة زكاة المال")
-    wealth = st.number_input("إجمالي المبلغ أو المدخرات:", min_value=0.0, value=10000.0)
-    zakat_amount = wealth * 0.025
-    st.metric("مقدار الزكاة الواجب إخراجه", f"{zakat_amount:.2f}")
+    wealth = st.number_input("إجمالي المبلغ:", min_value=0.0, value=10000.0)
+    st.metric("الزكاة الواجبة (2.5%)", f"{(wealth * 0.025):.2f}")
 
 # ==========================================
-# باقي الأدوات المحسنة
+# 6. الرواتب
 # ==========================================
 elif tool_choice == "💸 حاسبة الرواتب":
-    st.title("💸 حاسبة الرواتب السريعة")
+    st.title("💸 حاسبة الرواتب")
     basic = st.number_input("الراتب الأساسي:", value=500.0)
     allow = st.number_input("البدلات:", value=0.0)
     deduct = st.number_input("الخصومات:", value=0.0)
     st.metric("الراتب الصافي", f"{(basic + allow - deduct):.2f}")
 
+# ==========================================
+# 7. الدوام الدقيقة
+# ==========================================
 elif tool_choice == "📅 حاسبة الدوام الدقيقة":
     st.title("📅 حاسبة الدوام والراتب")
     monthly_salary = st.number_input("الراتب الشهري:", value=500.0)
@@ -317,6 +232,9 @@ elif tool_choice == "📅 حاسبة الدوام الدقيقة":
     else:
         st.error("التاريخ غير صالح")
 
+# ==========================================
+# 8. توزيع الشحن
+# ==========================================
 elif tool_choice == "⚖️ توزيع مصاريف الشحن":
     st.title("⚖️ توزيع مصاريف الشحن")
     inv = st.number_input("إجمالي الفاتورة:", value=1000.0)
@@ -327,44 +245,69 @@ elif tool_choice == "⚖️ توزيع مصاريف الشحن":
         c1.metric("النصيب من المصاريف", f"{(price * (exp/inv)):.2f}")
         c2.metric("التكلفة النهائية", f"{(price + (price * (exp/inv))):.2f}")
 
+# ==========================================
+# 9. الخصومات
+# ==========================================
 elif tool_choice == "🏷️ حاسبة الخصومات":
     st.title("🏷️ حاسبة الخصومات")
     p = st.number_input("السعر الأساسي:", value=100.0)
     d = st.number_input("نسبة الخصم (%):", value=20.0)
     st.metric("السعر النهائي", f"{(p - (p * (d/100))):.2f}")
 
+# ==========================================
+# 10. العمر
+# ==========================================
 elif tool_choice == "⏳ حاسبة العمر":
     st.title("⏳ حاسبة العمر")
     dob = st.date_input("تاريخ الميلاد:", datetime.date(2000,1,1))
-    st.metric("سنة الميلاد", dob.year)
+    today = datetime.date.today()
+    st.metric("العمر بالسنوات", today.year - dob.year)
 
+# ==========================================
+# 11. نقطة التعادل
+# ==========================================
 elif tool_choice == "📉 حاسبة نقطة التعادل":
     st.title("📉 نقطة التعادل")
     fix = st.number_input("المصاريف الثابتة:", value=1000.0)
     var = st.number_input("تكلفة القطعة:", value=50.0)
     sell = st.number_input("سعر البيع:", value=100.0)
     if sell > var:
-        st.metric("القطع للتعادل", f"{(fix / (sell - var)):.0f}")
+        st.metric("القطع المطلوبة", f"{(fix / (sell - var)):.0f}")
 
+# ==========================================
+# 12. الضريبة VAT
+# ==========================================
 elif tool_choice == "🧾 حاسبة الضريبة VAT":
     st.title("🧾 حاسبة الضريبة")
     p = st.number_input("المبلغ:", value=1000.0)
     st.metric("قيمة الضريبة (15%)", f"{(p * 0.15):.2f}")
 
+# ==========================================
+# 13. أرباح الكريبتو
+# ==========================================
 elif tool_choice == "📈 حاسبة أرباح الكريبتو":
     st.title("📈 أرباح الكريبتو")
     buy = st.number_input("دخول", value=60000.0)
     sell = st.number_input("خروج", value=62000.0)
     st.metric("الفرق", f"{(sell - buy):.2f}")
 
+# ==========================================
+# 14. المخاطر
+# ==========================================
 elif tool_choice == "🛡️ حاسبة إدارة المخاطر":
     st.title("🛡️ إدارة المخاطر")
     st.write("أداة قيد التطوير...")
 
+# ==========================================
+# 15. القوالب
+# ==========================================
 elif tool_choice == "📄 القوالب الجاهزة":
     st.title("📄 القوالب")
     st.write("حمل القوالب من هنا...")
 
+# ==========================================
+# 16. الخصوصية
+# ==========================================
 elif tool_choice == "📜 سياسة الخصوصية":
     st.title("📜 الخصوصية")
-    st.write("بياناتك آمنة ولن يتم حفظها في خوادمنا.")
+    st.write("بياناتك آمنة ولن يتم حفظها.")
