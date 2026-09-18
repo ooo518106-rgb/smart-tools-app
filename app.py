@@ -9,6 +9,13 @@ try:
 except ImportError:
     HAS_DATEUTIL = False
 
+try:
+    import qrcode
+    from io import BytesIO
+    HAS_QR = True
+except ImportError:
+    HAS_QR = False
+
 st.set_page_config(
     page_title="أدوات التاجر الذكي",
     page_icon="💰",
@@ -170,6 +177,8 @@ def page_header(icon, title, subtitle=""):
         )
 
 
+CURRENCIES = ["ر.س", "د.إ", "د.ك", "ر.ع", "ج.م", "$", "€", "£"]
+
 if "ecommerce_history" not in st.session_state:
     st.session_state.ecommerce_history = []
 
@@ -185,18 +194,31 @@ tool_choice = st.sidebar.radio(
     [
         "📦 حاسبة التجارة الإلكترونية",
         "💳 رسوم تابي وتمارا",
+        "🏪 عمولة المنصات (سلة/زد)",
+        "📢 حاسبة الإعلانات ROAS",
         "💬 صانع روابط واتساب",
         "🏦 حاسبة القروض والأقساط",
+        "💳 القسط على البطاقة الائتمانية",
         "🕋 حاسبة زكاة المال",
         "💸 حاسبة الرواتب",
+        "🛡️ نهاية الخدمة والتأمينات",
+        "👥 تكلفة الموظف الإجمالية",
         "📅 حاسبة الدوام الدقيقة",
         "⚖️ توزيع مصاريف الشحن",
         "🏷️ حاسبة الخصومات",
+        "🎁 حاسبة العروض الترويجية",
+        "📦 نقطة إعادة الطلب",
+        "📈 نمو المبيعات CAGR",
+        "📊 حاسبة LTV / CAC",
         "⏳ حاسبة العمر",
         "📉 حاسبة نقطة التعادل",
         "🧾 حاسبة الضريبة VAT",
         "📈 حاسبة أرباح الكريبتو",
         "🛡️ حاسبة إدارة المخاطر",
+        "💱 محول العملات",
+        "🗓️ حاسبة أيام العمل",
+        "📅 مولد أرقام الفواتير",
+        "🔲 مولد QR Code",
         "📊 لوحة التقارير الموحدة",
         "📄 القوالب الجاهزة",
         "📜 سياسة الخصوصية",
@@ -204,10 +226,13 @@ tool_choice = st.sidebar.radio(
 )
 
 
+# ==========================================
+# 1. حاسبة التجارة الإلكترونية
+# ==========================================
 if tool_choice == "📦 حاسبة التجارة الإلكترونية":
     page_header("📦", "حاسبة أرباح التجارة الإلكترونية", "احسب هوامش الربح الصافية بعد خصم الشحن ورسوم الدفع")
 
-    currency = st.selectbox("العملة", ["ر.س", "د.إ", "د.ك", "ر.ع", "ج.م", "$"], index=0)
+    currency = st.selectbox("العملة", CURRENCIES, index=0)
 
     col1, col2 = st.columns(2)
     with col1:
@@ -242,7 +267,6 @@ if tool_choice == "📦 حاسبة التجارة الإلكترونية":
 
     st.divider()
     st.subheader("💾 سجل الحسابات")
-    st.write("احفظ النتيجة لمقارنتها مع منتجات أخرى.")
 
     product_name = st.text_input("اسم المنتج:", placeholder="مثال: سماعة بلوتوث")
 
@@ -272,22 +296,20 @@ if tool_choice == "📦 حاسبة التجارة الإلكترونية":
 
         col_btn1, col_btn2 = st.columns(2)
         with col_btn1:
-            st.download_button(
-                label="📥 تحميل السجل (CSV)",
-                data=csv_data,
-                file_name="Ecommerce_Calculations.csv",
-                mime="text/csv",
-            )
+            st.download_button("📥 تحميل السجل (CSV)", data=csv_data, file_name="Ecommerce_Calculations.csv", mime="text/csv")
         with col_btn2:
             if st.button("🗑️ مسح السجل"):
                 st.session_state.ecommerce_history = []
                 st.rerun()
 
 
+# ==========================================
+# 2. رسوم تابي وتمارا
+# ==========================================
 elif tool_choice == "💳 رسوم تابي وتمارا":
     page_header("💳", "حاسبة رسوم الدفع الآجل", "احسب المبلغ الصافي بعد خصم رسوم التقسيط والضريبة")
 
-    currency = st.selectbox("العملة", ["ر.س", "د.إ", "د.ك", "ر.ع", "ج.م", "$"], index=0)
+    currency = st.selectbox("العملة", CURRENCIES, index=0)
     price = st.number_input(f"سعر المنتج ({currency})", min_value=0.0, value=100.0, step=1.0)
 
     col1, col2, col3 = st.columns(3)
@@ -312,6 +334,110 @@ elif tool_choice == "💳 رسوم تابي وتمارا":
     st.success(f"💰 الصافي للتاجر: **{fmt(net_to_merchant)} {currency}**")
 
 
+# ==========================================
+# 3. عمولة المنصات (سلة/زد/شوبيفاي)
+# ==========================================
+elif tool_choice == "🏪 عمولة المنصات (سلة/زد)":
+    page_header("🏪", "حاسبة عمولة المنصات", "سلة، زد، شوبيفاي - اعرف صافي أرباحك")
+
+    currency = st.selectbox("العملة", CURRENCIES, index=0)
+    platform = st.selectbox("المنصة", ["سلة", "زد", "شوبيفاي", "مخصصة"])
+
+    default_commission = {"سلة": 2.0, "زد": 2.0, "شوبيفاي": 2.9, "مخصصة": 0.0}
+    default_payment = {"سلة": 2.5, "زد": 2.5, "شوبيفاي": 2.9, "مخصصة": 0.0}
+
+    selling_price = st.number_input(f"سعر البيع ({currency})", min_value=0.0, value=100.0, step=1.0)
+    product_cost = st.number_input(f"تكلفة المنتج ({currency})", min_value=0.0, value=40.0, step=1.0)
+    shipping = st.number_input(f"الشحن الذي يدفعه التاجر ({currency})", min_value=0.0, value=15.0, step=1.0)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        commission = st.number_input("عمولة المنصة (%)", min_value=0.0, value=default_commission[platform], step=0.1)
+    with col2:
+        payment_fee = st.number_input("رسوم بوابة الدفع (%)", min_value=0.0, value=default_payment[platform], step=0.1)
+
+    payment_fixed = st.number_input(f"رسوم دفع ثابتة ({currency})", min_value=0.0, value=1.0, step=0.5)
+    vat = st.number_input("ضريبة القيمة المضافة (%)", min_value=0.0, value=15.0, step=1.0)
+
+    platform_fee = selling_price * (commission / 100)
+    payment_amount = (selling_price * (payment_fee / 100)) + payment_fixed
+    vat_amount = (platform_fee + payment_amount) * (vat / 100)
+    total_deductions = platform_fee + payment_amount + vat_amount
+    net_profit = selling_price - product_cost - shipping - total_deductions
+
+    st.divider()
+    st.subheader("📊 التفصيل")
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("عمولة المنصة", f"{fmt(platform_fee)} {currency}")
+    c2.metric("رسوم الدفع", f"{fmt(payment_amount)} {currency}")
+    c3.metric("الضريبة على الرسوم", f"{fmt(vat_amount)} {currency}")
+
+    c4, c5, c6 = st.columns(3)
+    c4.metric("إجمالي الخصومات", f"{fmt(total_deductions)} {currency}")
+    c5.metric("صافي الإيراد", f"{fmt(selling_price - total_deductions)} {currency}")
+    c6.metric("الربح الصافي", f"{fmt(net_profit)} {currency}", delta="ربح" if net_profit > 0 else "خسارة")
+
+    if net_profit > 0:
+        margin = (net_profit / selling_price) * 100
+        st.success(f"✅ هامش الربح: **{margin:.1f}%**")
+    else:
+        st.error("⚠️ المنتج غير مربح على هذه المنصة!")
+
+
+# ==========================================
+# 4. حاسبة الإعلانات ROAS
+# ==========================================
+elif tool_choice == "📢 حاسبة الإعلانات ROAS":
+    page_header("📢", "حاسبة الإعلانات", "ROAS, CPA, AOV - قيّم حملاتك بدقة")
+
+    currency = st.selectbox("العملة", CURRENCIES, index=0)
+
+    st.subheader("بيانات الحملة")
+    ad_spend = st.number_input(f"إجمالي الإنفاق الإعلاني ({currency})", min_value=0.0, value=1000.0, step=100.0)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        orders_count = st.number_input("عدد الطلبات", min_value=1, value=50, step=1)
+    with col2:
+        avg_order_value = st.number_input(f"متوسط قيمة الطلب ({currency})", min_value=0.0, value=150.0, step=10.0)
+
+    product_margin = st.number_input("هامش الربح على المنتج (%)", min_value=0.0, value=40.0, step=1.0)
+
+    revenue = orders_count * avg_order_value
+    roas = (revenue / ad_spend) if ad_spend > 0 else 0
+    cpa = (ad_spend / orders_count) if orders_count > 0 else 0
+    gross_profit = revenue * (product_margin / 100)
+    net_profit = gross_profit - ad_spend
+    break_even_roas = 100 / product_margin if product_margin > 0 else 0
+    max_cpa = avg_order_value * (product_margin / 100)
+
+    st.divider()
+    st.subheader("📊 النتائج")
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("الإيراد", f"{fmt(revenue)} {currency}")
+    c2.metric("ROAS", f"{roas:.2f}x")
+    c3.metric("CPA (تكلفة الطلب)", f"{fmt(cpa)} {currency}")
+
+    c4, c5, c6 = st.columns(3)
+    c4.metric("الربح الإجمالي", f"{fmt(gross_profit)} {currency}")
+    c5.metric("الربح الصافي", f"{fmt(net_profit)} {currency}", delta="ربح" if net_profit > 0 else "خسارة")
+    c6.metric("أقصى CPA مقبول", f"{fmt(max_cpa)} {currency}")
+
+    st.info(f"🎯 ROAS التعادل المطلوب: **{break_even_roas:.2f}x** — أي أقل من هذا خسارة")
+
+    if roas < break_even_roas:
+        st.error(f"⚠️ حملتك خاسرة! ROAS الحالي ({roas:.2f}x) أقل من التعادل ({break_even_roas:.2f}x)")
+    elif roas < break_even_roas * 1.5:
+        st.warning("⚡ الربح ضعيف، جرب تحسين الحملة.")
+    else:
+        st.success("🎉 حملة ناجحة ومربحة!")
+
+
+# ==========================================
+# 5. صانع روابط واتساب
+# ==========================================
 elif tool_choice == "💬 صانع روابط واتساب":
     page_header("💬", "صانع روابط واتساب", "رابط مباشر لبدء محادثة بضغطة زر")
 
@@ -330,10 +456,13 @@ elif tool_choice == "💬 صانع روابط واتساب":
             st.error("رقم غير صحيح (10 أرقام على الأقل).")
 
 
+# ==========================================
+# 6. حاسبة القروض والأقساط
+# ==========================================
 elif tool_choice == "🏦 حاسبة القروض والأقساط":
     page_header("🏦", "حاسبة القروض والأقساط", "احسب القسط الشهري بدقة")
 
-    currency = st.selectbox("العملة", ["ر.س", "د.إ", "د.ك", "ر.ع", "ج.م", "$"], index=0)
+    currency = st.selectbox("العملة", CURRENCIES, index=0)
     loan_amount = st.number_input(f"مبلغ القرض ({currency})", min_value=0.0, value=10000.0, step=100.0)
 
     col1, col2 = st.columns(2)
@@ -346,8 +475,6 @@ elif tool_choice == "🏦 حاسبة القروض والأقساط":
 
     if loan_amount <= 0:
         st.warning("⚠️ أدخل مبلغ قرض صحيح.")
-    elif months <= 0:
-        st.warning("⚠️ عدد الأشهر يجب أن يكون > صفر.")
     else:
         if interest_rate > 0:
             monthly_rate = (interest_rate / 100) / 12
@@ -363,9 +490,52 @@ elif tool_choice == "🏦 حاسبة القروض والأقساط":
         c1.metric("القسط الشهري", f"{fmt(monthly_payment)} {currency}")
         c2.metric("الفوائد", f"{fmt(total_interest)} {currency}")
         c3.metric("الإجمالي", f"{fmt(total_paid)} {currency}")
-        st.info(f"💡 إجمالي المسدد: **{fmt(total_paid)} {currency}**")
 
 
+# ==========================================
+# 7. القسط على البطاقة الائتمانية
+# ==========================================
+elif tool_choice == "💳 القسط على البطاقة الائتمانية":
+    page_header("💳", "القسط على البطاقة الائتمانية", "اعرف مدة السداد وتكلفة الفوائد")
+
+    currency = st.selectbox("العملة", CURRENCIES, index=0)
+    balance = st.number_input(f"المبلغ المستحق ({currency})", min_value=0.0, value=5000.0, step=100.0)
+    annual_rate = st.number_input("نسبة الفائدة السنوية (%)", min_value=0.0, value=24.0, step=0.5,
+                                   help="عادة 20%-30% سنوياً على البطاقات الائتمانية")
+    monthly_payment = st.number_input(f"الدفعة الشهرية ({currency})", min_value=1.0, value=300.0, step=50.0)
+
+    st.divider()
+
+    if monthly_payment <= balance * (annual_rate / 100 / 12):
+        st.error("⚠️ الدفعة الشهرية أقل من الفائدة الشهرية! لن تسدد الدين أبداً.")
+    else:
+        monthly_rate = (annual_rate / 100) / 12
+        remaining = balance
+        total_interest = 0
+        months = 0
+
+        while remaining > 0 and months < 600:
+            interest = remaining * monthly_rate
+            principal = monthly_payment - interest
+            if principal <= 0:
+                break
+            remaining -= principal
+            total_interest += interest
+            months += 1
+
+        total_paid = balance + total_interest
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("المدة", f"{months} شهر")
+        c2.metric("إجمالي الفوائد", f"{fmt(total_interest)} {currency}")
+        c3.metric("إجمالي المسدد", f"{fmt(total_paid)} {currency}")
+
+        st.warning(f"💡 ستدفع **{fmt(total_interest)} {currency}** فوائد إضافية. جرب زيادة الدفعة الشهرية لتوفير الفوائد.")
+
+
+# ==========================================
+# 8. حاسبة زكاة المال
+# ==========================================
 elif tool_choice == "🕋 حاسبة زكاة المال":
     page_header("🕋", "حاسبة زكاة المال", "احسب مقدار الزكاة 2.5%")
 
@@ -381,10 +551,13 @@ elif tool_choice == "🕋 حاسبة زكاة المال":
         st.metric("مقدار الزكاة", f"{fmt(zakat_amount)}")
 
 
+# ==========================================
+# 9. حاسبة الرواتب
+# ==========================================
 elif tool_choice == "💸 حاسبة الرواتب":
     page_header("💸", "حاسبة الرواتب", "احسب الراتب المستحق بدقة")
 
-    currency = st.selectbox("العملة", ["ر.س", "د.إ", "د.ك", "ر.ع", "ج.م", "$"], index=0)
+    currency = st.selectbox("العملة", CURRENCIES, index=0)
     basic_salary = st.number_input(f"الراتب الأساسي ({currency})", min_value=0.0, value=500.0, step=50.0)
 
     col1, col2 = st.columns(2)
@@ -402,10 +575,104 @@ elif tool_choice == "💸 حاسبة الرواتب":
         st.metric("💰 الراتب المستحق", f"{fmt(net_salary)} {currency}")
 
 
+# ==========================================
+# 10. نهاية الخدمة والتأمينات
+# ==========================================
+elif tool_choice == "🛡️ نهاية الخدمة والتأمينات":
+    page_header("🛡️", "نهاية الخدمة والتأمينات", "حساب مكافأة نهاية الخدمة وحصص التأمينات (السعودية)")
+
+    currency = st.selectbox("العملة", CURRENCIES, index=0)
+    salary = st.number_input(f"الراتب الأخير ({currency})", min_value=0.0, value=5000.0, step=100.0)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        years = st.number_input("سنوات الخدمة", min_value=0, value=5, step=1)
+    with col2:
+        months = st.number_input("أشهر إضافية", min_value=0, max_value=11, value=0, step=1)
+
+    reason = st.radio("سبب إنهاء العلاقة:", ["استقالة", "إنهاء من صاحب العمل"], horizontal=True)
+    nationality = st.radio("الجنسية:", ["سعودي", "غير سعودي"], horizontal=True)
+
+    total_years = years + (months / 12)
+    first_5 = min(total_years, 5)
+    after_5 = max(total_years - 5, 0)
+
+    gratuity = (first_5 * salary * 0.5) + (after_5 * salary * 1.0)
+
+    if reason == "استقالة":
+        if total_years < 2:
+            gratuity = 0
+        elif total_years < 5:
+            gratuity = gratuity / 3
+        elif total_years < 10:
+            gratuity = gratuity * (2 / 3)
+
+    st.divider()
+    st.subheader("🛡️ التأمينات الاجتماعية (شهرياً)")
+
+    if nationality == "سعودي":
+        gosi_employee = salary * 0.0975
+        gosi_employer = salary * 0.1175
+    else:
+        gosi_employee = 0
+        gosi_employer = salary * 0.02
+
+    c1, c2 = st.columns(2)
+    c1.metric("حصة الموظف", f"{fmt(gosi_employee)} {currency}")
+    c2.metric("حصة صاحب العمل", f"{fmt(gosi_employer)} {currency}")
+
+    st.divider()
+    st.subheader("💰 مكافأة نهاية الخدمة")
+
+    st.metric("المكافأة المستحقة", f"{fmt(gratuity)} {currency}")
+    st.info(f"📅 مدة الخدمة: **{years} سنة و {months} شهر** | السبب: **{reason}**")
+
+
+# ==========================================
+# 11. تكلفة الموظف الإجمالية
+# ==========================================
+elif tool_choice == "👥 تكلفة الموظف الإجمالية":
+    page_header("👥", "تكلفة الموظف الإجمالية", "اعرف التكلفة الحقيقية للموظف سنوياً")
+
+    currency = st.selectbox("العملة", CURRENCIES, index=0)
+    salary = st.number_input(f"الراتب الأساسي ({currency})", min_value=0.0, value=5000.0, step=100.0)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        housing = st.number_input(f"بدل السكن ({currency})", min_value=0.0, value=1250.0, step=100.0)
+        transport = st.number_input(f"بدل المواصلات ({currency})", min_value=0.0, value=500.0, step=50.0)
+    with col2:
+        other_allowances = st.number_input(f"بدلات أخرى ({currency})", min_value=0.0, value=0.0, step=100.0)
+        annual_bonus = st.number_input(f"مكافآت سنوية ({currency})", min_value=0.0, value=0.0, step=500.0)
+
+    nationality = st.radio("الجنسية:", ["سعودي", "غير سعودي"], horizontal=True)
+    vacation_days = st.number_input("أيام الإجازة السنوية", min_value=0, value=21, step=1)
+
+    total_salary = salary + housing + transport + other_allowances
+    gosi_employer = total_salary * 0.1175 if nationality == "سعودي" else total_salary * 0.02
+
+    monthly_cost = total_salary + gosi_employer
+    annual_cost = (monthly_cost * 12) + annual_bonus
+
+    daily_cost = total_salary / 30
+    vacation_cost = daily_cost * vacation_days
+
+    st.divider()
+    c1, c2, c3 = st.columns(3)
+    c1.metric("التكلفة الشهرية", f"{fmt(monthly_cost)} {currency}")
+    c2.metric("التكلفة السنوية", f"{fmt(annual_cost)} {currency}")
+    c3.metric("تكلفة الإجازات", f"{fmt(vacation_cost)} {currency}")
+
+    st.info(f"💡 التكلفة اليومية الفعلية: **{fmt(annual_cost / 365)} {currency}**")
+
+
+# ==========================================
+# 12. حاسبة الدوام الدقيقة
+# ==========================================
 elif tool_choice == "📅 حاسبة الدوام الدقيقة":
     page_header("📅", "حاسبة الدوام والراتب", "احسب راتبك حسب الساعات الفعلية")
 
-    currency = st.selectbox("العملة", ["ر.س", "د.إ", "د.ك", "ر.ع", "ج.م", "$"], index=0)
+    currency = st.selectbox("العملة", CURRENCIES, index=0)
     monthly_salary = st.number_input(f"الراتب الشهري ({currency})", min_value=0.0, value=500.0, step=50.0)
 
     st.divider()
@@ -440,10 +707,13 @@ elif tool_choice == "📅 حاسبة الدوام الدقيقة":
         st.error("⚠️ تاريخ النهاية يجب أن يكون بعد البداية!")
 
 
+# ==========================================
+# 13. توزيع مصاريف الشحن
+# ==========================================
 elif tool_choice == "⚖️ توزيع مصاريف الشحن":
     page_header("⚖️", "توزيع مصاريف الشحن", "وزّع المصاريف على الأصناف بعدالة")
 
-    currency = st.selectbox("العملة", ["ر.س", "د.إ", "د.ك", "ر.ع", "ج.م", "$"], index=0)
+    currency = st.selectbox("العملة", CURRENCIES, index=0)
     total_invoice = st.number_input(f"إجمالي الفاتورة ({currency})", min_value=0.01, value=1000.0, step=100.0)
     total_expenses = st.number_input(f"إجمالي الشحن ({currency})", min_value=0.0, value=200.0, step=10.0)
     item_price = st.number_input(f"سعر الصنف ({currency})", min_value=0.0, value=50.0, step=10.0)
@@ -457,10 +727,13 @@ elif tool_choice == "⚖️ توزيع مصاريف الشحن":
         c3.metric("التكلفة النهائية", f"{fmt(item_price + item_expense)} {currency}")
 
 
+# ==========================================
+# 14. حاسبة الخصومات
+# ==========================================
 elif tool_choice == "🏷️ حاسبة الخصومات":
     page_header("🏷️", "حاسبة الخصومات", "احسب السعر النهائي بعد الخصم")
 
-    currency = st.selectbox("العملة", ["ر.س", "د.إ", "د.ك", "ر.ع", "ج.م", "$"], index=0)
+    currency = st.selectbox("العملة", CURRENCIES, index=0)
     price_before = st.number_input(f"السعر الأساسي ({currency})", min_value=0.0, value=100.0, step=10.0)
 
     discount_type = st.radio("نوع الخصم:", ["نسبة مئوية (%)", "مبلغ ثابت"], horizontal=True)
@@ -476,6 +749,177 @@ elif tool_choice == "🏷️ حاسبة الخصومات":
     c2.metric("السعر النهائي", f"{fmt(price_before - disc_amount)} {currency}")
 
 
+# ==========================================
+# 15. حاسبة العروض الترويجية
+# ==========================================
+elif tool_choice == "🎁 حاسبة العروض الترويجية":
+    page_header("🎁", "حاسبة العروض الترويجية", "هل عرضك مربح؟ احسبه بدقة")
+
+    currency = st.selectbox("العملة", CURRENCIES, index=0)
+
+    offer_type = st.selectbox("نوع العرض", [
+        "اشترِ X واحصل على Y",
+        "خصم على الثاني",
+        "خصم على الكمية",
+        "منتج مجاني",
+    ])
+
+    unit_cost = st.number_input(f"تكلفة القطعة ({currency})", min_value=0.0, value=40.0, step=5.0)
+    unit_price = st.number_input(f"سعر بيع القطعة ({currency})", min_value=0.0, value=100.0, step=5.0)
+
+    st.divider()
+
+    if offer_type == "اشترِ X واحصل على Y":
+        buy = st.number_input("اشترِ", min_value=1, value=2, step=1)
+        free = st.number_input("احصل مجاناً على", min_value=1, value=1, step=1)
+
+        total_units = buy + free
+        revenue = unit_price * buy
+        cost = unit_cost * total_units
+        profit = revenue - cost
+        effective_discount = (free / total_units) * 100
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("الإيراد", f"{fmt(revenue)} {currency}")
+        c2.metric("التكلفة", f"{fmt(cost)} {currency}")
+        c3.metric("الربح", f"{fmt(profit)} {currency}", delta="ربح" if profit > 0 else "خسارة")
+
+        st.info(f"📊 قيمة الخصم الفعلية: **{effective_discount:.1f}%**")
+
+    elif offer_type == "خصم على الثاني":
+        second_discount = st.number_input("نسبة الخصم على الثاني (%)", min_value=0.0, max_value=100.0, value=50.0, step=5.0)
+
+        revenue = unit_price + (unit_price * (1 - second_discount / 100))
+        cost = unit_cost * 2
+        profit = revenue - cost
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("الإيراد", f"{fmt(revenue)} {currency}")
+        c2.metric("التكلفة", f"{fmt(cost)} {currency}")
+        c3.metric("الربح", f"{fmt(profit)} {currency}", delta="ربح" if profit > 0 else "خسارة")
+
+        effective_discount = (second_discount / 2)
+        st.info(f"📊 قيمة الخصم الفعلية: **{effective_discount:.1f}%**")
+
+    elif offer_type == "خصم على الكمية":
+        qty = st.number_input("الكمية المطلوبة", min_value=2, value=3, step=1)
+        discount_percent = st.number_input("نسبة الخصم (%)", min_value=0.0, max_value=100.0, value=15.0, step=1.0)
+
+        revenue = unit_price * qty * (1 - discount_percent / 100)
+        cost = unit_cost * qty
+        profit = revenue - cost
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("الإيراد", f"{fmt(revenue)} {currency}")
+        c2.metric("التكلفة", f"{fmt(cost)} {currency}")
+        c3.metric("الربح", f"{fmt(profit)} {currency}", delta="ربح" if profit > 0 else "خسارة")
+
+    else:
+        free_count = st.number_input("عدد المنتجات المجانية", min_value=1, value=1, step=1)
+        paid_count = st.number_input("عدد المنتجات المدفوعة", min_value=1, value=1, step=1)
+
+        revenue = unit_price * paid_count
+        cost = unit_cost * (paid_count + free_count)
+        profit = revenue - cost
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("الإيراد", f"{fmt(revenue)} {currency}")
+        c2.metric("التكلفة", f"{fmt(cost)} {currency}")
+        c3.metric("الربح", f"{fmt(profit)} {currency}", delta="ربح" if profit > 0 else "خسارة")
+
+
+# ==========================================
+# 16. نقطة إعادة الطلب
+# ==========================================
+elif tool_choice == "📦 نقطة إعادة الطلب":
+    page_header("📦", "حاسبة نقطة إعادة الطلب", "متى يجب أن أطلب مخزوناً جديداً؟")
+
+    avg_daily_sales = st.number_input("متوسط البيع اليومي (قطعة)", min_value=0.0, value=10.0, step=1.0)
+    lead_time_days = st.number_input("مدة التوريد (أيام)", min_value=0, value=7, step=1)
+    safety_stock = st.number_input("مخزون الأمان (قطعة)", min_value=0, value=20, step=5)
+    current_stock = st.number_input("المخزون الحالي (قطعة)", min_value=0, value=100, step=10)
+
+    reorder_point = (avg_daily_sales * lead_time_days) + safety_stock
+    daily_consumption = avg_daily_sales if avg_daily_sales > 0 else 1
+    days_until_stockout = current_stock / daily_consumption
+
+    st.divider()
+    c1, c2, c3 = st.columns(3)
+    c1.metric("نقطة إعادة الطلب", f"{reorder_point:,.0f} قطعة")
+    c2.metric("الأيام حتى النفاذ", f"{days_until_stockout:.1f} يوم")
+    c3.metric("المخزون الحالي", f"{current_stock} قطعة")
+
+    if current_stock <= reorder_point:
+        st.error(f"🚨 يجب أن تطلب مخزوناً الآن! المخزون ({current_stock}) أقل من نقطة الطلب ({reorder_point:.0f})")
+    else:
+        remaining = current_stock - reorder_point
+        st.success(f"✅ المخزون جيد. متبقي **{remaining}** قطعة قبل الحاجة للطلب.")
+        st.info(f"📅 اطلب بعد **{(remaining / daily_consumption):.1f}** يوم")
+
+
+# ==========================================
+# 17. نمو المبيعات CAGR
+# ==========================================
+elif tool_choice == "📈 نمو المبيعات CAGR":
+    page_header("📈", "حاسبة نمو المبيعات", "نسبة النمو السنوية المركبة")
+
+    start_value = st.number_input("قيمة البداية", min_value=0.0, value=10000.0, step=1000.0)
+    end_value = st.number_input("قيمة النهاية", min_value=0.0, value=25000.0, step=1000.0)
+    years = st.number_input("عدد السنوات", min_value=1, value=3, step=1)
+
+    st.divider()
+
+    if start_value <= 0 or years <= 0:
+        st.warning("⚠️ أدخل قيماً صحيحة.")
+    else:
+        cagr = ((end_value / start_value) ** (1 / years) - 1) * 100
+        total_growth = ((end_value - start_value) / start_value) * 100
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("النمو السنوي CAGR", f"{cagr:.2f}%")
+        c2.metric("النمو الإجمالي", f"{total_growth:.2f}%")
+        c3.metric("الفرق", f"{fmt(end_value - start_value)}")
+
+        if cagr > 0:
+            st.success(f"📈 نمو إيجابي بمعدل **{cagr:.2f}%** سنوياً")
+        else:
+            st.error(f"📉 انخفاض بمعدل **{cagr:.2f}%** سنوياً")
+
+
+# ==========================================
+# 18. LTV / CAC
+# ==========================================
+elif tool_choice == "📊 حاسبة LTV / CAC":
+    page_header("📊", "حاسبة LTV / CAC", "قيمة العميل مدى الحياة مقابل تكلفة اكتسابه")
+
+    currency = st.selectbox("العملة", CURRENCIES, index=0)
+
+    avg_order = st.number_input(f"متوسط قيمة الطلب ({currency})", min_value=0.0, value=150.0, step=10.0)
+    margin_percent = st.number_input("هامش الربح (%)", min_value=0.0, value=40.0, step=1.0)
+    orders_per_year = st.number_input("عدد الطلبات سنوياً", min_value=1, value=4, step=1)
+    customer_years = st.number_input("عدد سنوات بقاء العميل", min_value=1, value=3, step=1)
+    marketing_cost = st.number_input(f"تكلفة التسويق لاكتساب عميل ({currency})", min_value=0.0, value=50.0, step=10.0)
+
+    ltv = avg_order * (margin_percent / 100) * orders_per_year * customer_years
+    ratio = ltv / marketing_cost if marketing_cost > 0 else 0
+
+    st.divider()
+    c1, c2, c3 = st.columns(3)
+    c1.metric("LTV", f"{fmt(ltv)} {currency}")
+    c2.metric("CAC", f"{fmt(marketing_cost)} {currency}")
+    c3.metric("LTV / CAC", f"{ratio:.2f}x")
+
+    if ratio >= 3:
+        st.success(f"✅ نسبة ممتازة! كل ريال تسويق يعود بـ **{ratio:.2f}**")
+    elif ratio >= 1:
+        st.warning(f"⚡ نسبة مقبولة، لكن الأفضل أن تكون 3x على الأقل.")
+    else:
+        st.error("🚨 تخسر في التسويق! LTV أقل من CAC.")
+
+
+# ==========================================
+# 19. حاسبة العمر
+# ==========================================
 elif tool_choice == "⏳ حاسبة العمر":
     page_header("⏳", "حاسبة العمر الدقيقة", "احسب عمرك بالسنوات والأيام")
 
@@ -541,10 +985,13 @@ elif tool_choice == "⏳ حاسبة العمر":
             st.info(f"🎂 متبقي **{days_to_birthday}** يوماً لعيد ميلادك.")
 
 
+# ==========================================
+# 20. نقطة التعادل
+# ==========================================
 elif tool_choice == "📉 حاسبة نقطة التعادل":
     page_header("📉", "حاسبة نقطة التعادل", "اعرف عدد القطع لتغطية التكاليف")
 
-    currency = st.selectbox("العملة", ["ر.س", "د.إ", "د.ك", "ر.ع", "ج.م", "$"], index=0)
+    currency = st.selectbox("العملة", CURRENCIES, index=0)
     fixed_costs = st.number_input(f"المصاريف الثابتة ({currency})", min_value=0.0, value=1000.0, step=100.0)
     variable_cost = st.number_input(f"تكلفة القطعة ({currency})", min_value=0.0, value=50.0, step=5.0)
     sell_price = st.number_input(f"سعر البيع ({currency})", min_value=0.0, value=100.0, step=5.0)
@@ -562,10 +1009,13 @@ elif tool_choice == "📉 حاسبة نقطة التعادل":
         c3.metric("هامش المساهمة", f"{fmt(contribution_margin)} {currency}")
 
 
+# ==========================================
+# 21. الضريبة VAT
+# ==========================================
 elif tool_choice == "🧾 حاسبة الضريبة VAT":
     page_header("🧾", "حاسبة ضريبة القيمة المضافة", "أضف أو استخرج الضريبة")
 
-    currency = st.selectbox("العملة", ["ر.س", "د.إ", "د.ك", "ر.ع", "ج.م", "$"], index=0)
+    currency = st.selectbox("العملة", CURRENCIES, index=0)
     calc_mode = st.radio("طريقة الحساب:", ["إضافة الضريبة", "استخراج الضريبة"], horizontal=True)
     price = st.number_input(f"المبلغ ({currency})", min_value=0.0, value=1000.0, step=100.0)
     vat_rate = st.number_input("نسبة الضريبة (%)", min_value=0.0, value=15.0, step=1.0)
@@ -586,6 +1036,9 @@ elif tool_choice == "🧾 حاسبة الضريبة VAT":
         c2.metric("الضريبة", f"{fmt(vat_amount)} {currency}")
 
 
+# ==========================================
+# 22. أرباح الكريبتو
+# ==========================================
 elif tool_choice == "📈 حاسبة أرباح الكريبتو":
     page_header("📈", "حاسبة أرباح الكريبتو", "احسب صافي ربحك بعد الرسوم")
 
@@ -612,6 +1065,9 @@ elif tool_choice == "📈 حاسبة أرباح الكريبتو":
     c3.metric("الربح الصافي", f"${fmt(net_profit)}", delta=f"{roi:.2f}%" if net_profit != 0 else None)
 
 
+# ==========================================
+# 23. إدارة المخاطر
+# ==========================================
 elif tool_choice == "🛡️ حاسبة إدارة المخاطر":
     page_header("🛡️", "حاسبة إدارة المخاطر", "حدد حجم الصفقة المناسب")
 
@@ -641,6 +1097,175 @@ elif tool_choice == "🛡️ حاسبة إدارة المخاطر":
         p3.metric("حجم الصفقة", f"{fmt(position_value)} USDT")
 
 
+# ==========================================
+# 24. محول العملات
+# ==========================================
+elif tool_choice == "💱 محول العملات":
+    page_header("💱", "محول العملات", "أسعار تقريبية - راجع البنك للأسعار المحدثة")
+
+    # أسعار تقريبية مقابل 1 دولار أمريكي
+    rates = {
+        "USD ($)": 1.0,
+        "SAR (ر.س)": 3.75,
+        "AED (د.إ)": 3.67,
+        "KWD (د.ك)": 0.31,
+        "OMR (ر.ع)": 0.385,
+        "EGP (ج.م)": 48.5,
+        "EUR (€)": 0.92,
+        "GBP (£)": 0.79,
+        "QAR (ر.ق)": 3.64,
+        "BHD (د.ب)": 0.376,
+    }
+
+    col1, col2 = st.columns(2)
+    with col1:
+        from_cur = st.selectbox("من", list(rates.keys()), index=1)
+    with col2:
+        to_cur = st.selectbox("إلى", list(rates.keys()), index=0)
+
+    amount = st.number_input("المبلغ", min_value=0.0, value=100.0, step=10.0)
+
+    usd_amount = amount / rates[from_cur]
+    result = usd_amount * rates[to_cur]
+
+    st.divider()
+    st.metric("النتيجة", f"{fmt(result, 4)}", delta=f"{from_cur.split()[0]} → {to_cur.split()[0]}")
+
+    st.info(f"💡 1 {from_cur.split()[0]} = {fmt(rates[to_cur] / rates[from_cur], 4)} {to_cur.split()[0]}")
+    st.caption("⚠️ الأسعار تقريبية وقد تختلف عن أسعار البنوك. حدّثها يدوياً إذا لزم.")
+
+
+# ==========================================
+# 25. حاسبة أيام العمل
+# ==========================================
+elif tool_choice == "🗓️ حاسبة أيام العمل":
+    page_header("🗓️", "حاسبة أيام العمل", "احسب أيام العمل الفعلية بين تاريخين")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        start = st.date_input("من تاريخ:", value=datetime.date.today())
+    with col2:
+        end = st.date_input("إلى تاريخ:", value=datetime.date.today() + datetime.timedelta(days=30))
+
+    exclude_friday = st.checkbox("استبعاد أيام الجمعة", value=True)
+    exclude_saturday = st.checkbox("استبعاد أيام السبت", value=False)
+    exclude_sunday = st.checkbox("استبعاد أيام الأحد", value=False)
+
+    official_holidays = st.number_input("أيام العطل الرسمية", min_value=0, value=0, step=1)
+
+    if start <= end:
+        total_days = (end - start).days + 1
+        work_days = 0
+        current = start
+
+        while current <= end:
+            weekday = current.weekday()  # 0=Mon ... 4=Fri, 5=Sat, 6=Sun
+            skip = False
+            if exclude_friday and weekday == 4:
+                skip = True
+            if exclude_saturday and weekday == 5:
+                skip = True
+            if exclude_sunday and weekday == 6:
+                skip = True
+            if not skip:
+                work_days += 1
+            current += datetime.timedelta(days=1)
+
+        work_days = max(work_days - official_holidays, 0)
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("إجمالي الأيام", total_days)
+        c2.metric("أيام العمل", work_days)
+        c3.metric("أيام الراحة", total_days - work_days)
+
+        st.info(f"📅 من **{start}** إلى **{end}**")
+    else:
+        st.error("⚠️ تاريخ النهاية يجب أن يكون بعد البداية.")
+
+
+# ==========================================
+# 26. مولد أرقام الفواتير
+# ==========================================
+elif tool_choice == "📅 مولد أرقام الفواتير":
+    page_header("📅", "مولد أرقام الفواتير", "أنشئ أرقام فواتير تلقائية متسلسلة")
+
+    prefix = st.text_input("البادئة (Prefix):", value="INV")
+    year = st.number_input("السنة:", min_value=2000, max_value=2100, value=datetime.date.today().year, step=1)
+    separator = st.selectbox("الفاصل:", ["-", "/", "_", "."], index=0)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        start_num = st.number_input("ابدأ من الرقم:", min_value=1, value=1, step=1)
+    with col2:
+        padding = st.number_input("عدد الخانات", min_value=1, max_value=10, value=4, step=1)
+
+    count = st.number_input("عدد الفواتير المطلوب توليدها:", min_value=1, max_value=500, value=10, step=1)
+
+    if st.button("🔢 توليد الأرقام"):
+        numbers = []
+        for i in range(count):
+            num = start_num + i
+            formatted = f"{prefix}{separator}{year}{separator}{num:0{padding}d}"
+            numbers.append(formatted)
+
+        df = pd.DataFrame({"رقم الفاتورة": numbers})
+        st.dataframe(df, use_container_width=True)
+
+        csv = df.to_csv(index=False).encode("utf-8-sig")
+        st.download_button("📥 تحميل (CSV)", data=csv, file_name="invoice_numbers.csv", mime="text/csv")
+
+
+# ==========================================
+# 27. مولد QR Code
+# ==========================================
+elif tool_choice == "🔲 مولد QR Code":
+    page_header("🔲", "مولد QR Code", "أنشئ رمز QR لأي رابط أو نص")
+
+    content = st.text_area(
+        "المحتوى (رابط، رقم، نص):",
+        placeholder="https://example.com أو 966500000000",
+    )
+
+    col1, col2 = st.columns(2)
+    with col1:
+        size = st.number_input("الحجم (بكسل):", min_value=100, max_value=1000, value=300, step=50)
+    with col2:
+        fill_color = st.color_picker("لون الرمز:", "#1e3c72")
+
+    if st.button("✨ توليد QR"):
+        if not content.strip():
+            st.warning("⚠️ أدخل محتوى أولاً.")
+        elif not HAS_QR:
+            st.error("⚠️ مكتبة qrcode غير مثبتة. أضف `qrcode[pil]` إلى requirements.txt")
+        else:
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_H,
+                box_size=10,
+                border=2,
+            )
+            qr.add_data(content.strip())
+            qr.make(fit=True)
+
+            img = qr.make_image(fill_color=fill_color, back_color="white")
+
+            buf = BytesIO()
+            img.save(buf, format="PNG")
+            buf.seek(0)
+
+            st.image(buf, caption="رمز QR", width=size)
+
+            st.download_button(
+                "📥 تحميل QR (PNG)",
+                data=buf.getvalue(),
+                file_name="qrcode.png",
+                mime="image/png",
+            )
+
+
+# ==========================================
+# 28. لوحة التقارير
+# ==========================================
 elif tool_choice == "📊 لوحة التقارير الموحدة":
     page_header("📊", "لوحة التقارير الموحدة", "جميع النتائج المحفوظة في مكان واحد")
 
@@ -661,6 +1286,9 @@ elif tool_choice == "📊 لوحة التقارير الموحدة":
                 st.rerun()
 
 
+# ==========================================
+# 29. القوالب الجاهزة
+# ==========================================
 elif tool_choice == "📄 القوالب الجاهزة":
     page_header("📄", "قوالب محاسبية وتجارية", "قوالب CSV جاهزة للفتح في Excel")
 
@@ -714,10 +1342,25 @@ elif tool_choice == "📄 القوالب الجاهزة":
         ).encode("utf-8-sig")
         st.download_button("📥 تحميل القالب", data=pricing_csv, file_name="pricing_template.csv", mime="text/csv", key="dl_pricing")
 
+    with st.expander("📝 عرض سعر"):
+        quote_csv = (
+            "البند,الوصف,الكمية,السعر,الإجمالي\n"
+            "1,منتج أ,5,100.00,500.00\n"
+            "2,منتج ب,3,150.00,450.00\n"
+            "3,خصم خاص,,,-50.00\n"
+            ",الإجمالي قبل الضريبة,,,900.00\n"
+            ",ضريبة 15%,,,135.00\n"
+            ",الإجمالي النهائي,,,1035.00\n"
+        ).encode("utf-8-sig")
+        st.download_button("📥 تحميل القالب", data=quote_csv, file_name="quotation.csv", mime="text/csv", key="dl_quote")
+
     st.divider()
     st.info("💡 افتح ملفات CSV في Excel مباشرة.")
 
 
+# ==========================================
+# 30. الخصوصية
+# ==========================================
 elif tool_choice == "📜 سياسة الخصوصية":
     page_header("📜", "سياسة الخصوصية", "التزاماتنا تجاهك")
 
