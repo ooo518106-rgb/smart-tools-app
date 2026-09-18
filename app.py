@@ -3,17 +3,17 @@ import streamlit as st
 # إعدادات الصفحة الأساسية
 st.set_page_config(page_title="أدوات التاجر الذكي", page_icon="💰", layout="centered")
 
-# CSS جذري لإخفاء الأزرار المزعجة
+# CSS ذكي لإخفاء العلامات المزعجة مع الحفاظ على زر القائمة للجوال
 st.markdown("""
 <style>
-    /* إخفاء شريط الأدوات العلوي والزر الأحمر والفوتر بشكل نهائي */
-    [data-testid="stToolbar"], [data-testid="stHeader"], [data-testid="stDecoration"] {
-        display: none !important;
-    }
-    #MainMenu, footer, header {
-        visibility: hidden !important;
-        display: none !important;
-    }
+    /* إخفاء الفوتر (Hosted with Streamlit) */
+    footer {visibility: hidden;}
+    
+    /* إخفاء زر النشر الأحمر (Deploy) */
+    .stAppDeployButton {display: none;}
+    
+    /* إخفاء شريط أدوات المطورين العلوي مع ترك زر القائمة */
+    [data-testid="stToolbar"] {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
