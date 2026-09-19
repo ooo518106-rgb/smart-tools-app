@@ -12,6 +12,7 @@ from helpers import (
     get_hijri_date, print_button,
     pdf_download_button, quick_print,
     backup_restore_ui,
+    safe_date, get_gosi_rates,
 )
 
 try:
@@ -41,6 +42,7 @@ defaults = {
     "reminders": [],
     "customers": [],
     "pin_ok": False,
+    "tool": "🏠 الرئيسية",
 }
 for k, v in defaults.items():
     if k not in st.session_state:
@@ -409,11 +411,25 @@ if search_query.strip():
 else:
     filtered = ALL_TOOLS
 
-tool_choice = "🏠 الرئيسية"
 if not filtered:
     st.sidebar.warning("لا توجد نتائج")
+    st.session_state.tool = "🏠 الرئيسية"
+    tool_choice = "🏠 الرئيسية"
 else:
-    tool_choice = st.sidebar.radio("الأدوات", filtered)
+    if st.session_state.tool not in filtered:
+        st.session_state.tool = filtered[0]
+
+    try:
+        current_index = filtered.index(st.session_state.tool)
+    except ValueError:
+        current_index = 0
+
+    tool_choice = st.sidebar.radio(
+        "الأدوات",
+        filtered,
+        key="tool",
+        index=current_index,
+    )
 
 if st.session_state.all_results:
     st.sidebar.markdown("---")
@@ -532,9 +548,15 @@ if tool_choice == "🏠 الرئيسية":
         cols = st.columns(2)
         for i, t in enumerate(tools):
             with cols[i % 2]:
-                if st.button(t, key=f"home_{cat_name}_{t}", use_container_width=True):
+                def open_tool(name=t):
+                    st.session_state.tool = name
                     st.session_state.search_query = ""
-                    st.rerun()
+                st.button(
+                    t,
+                    key=f"home_{cat_name}_{t}",
+                    on_click=open_tool,
+                    use_container_width=True,
+                )
 
     if total_ops > 0:
         st.markdown('<h2 class="section-title">📈 آخر العمليات</h2>', unsafe_allow_html=True)
@@ -945,24 +967,36 @@ elif tool_choice == "💬 روابط واتساب":
 # 🏦 القروض والأقساط
 # ============================================================
 elif tool_choice == "🏦 القروض والأقساط":
-    page_header("🏦", "حاسبة القروض والأقساط", "احسب القسط الشهري بدقة")
+    page_header("🏦", "حاسبة القروض والأقساط", "قارن بين الفائدة المتناقصة والثابتة")
 
     currency = st.selectbox("العملة", CURRENCIES, index=0)
     loan = st.number_input(f"المبلغ ({currency})", min_value=0.0, value=10000.0, step=100.0)
 
     col1, col2 = st.columns(2)
     with col1:
-        rate = st.number_input("الفائدة السنوية (%)", min_value=0.0, value=5.0, step=0.1)
+        rate = st.number_input("نسبة الفائدة/الربح السنوية (%)", min_value=0.0, value=5.0, step=0.1)
     with col2:
         months = st.number_input("المدة (أشهر)", min_value=1, value=60, step=1)
 
+    method = st.radio(
+        "طريقة الحساب:",
+        ["متناقصة (تنخفض الفائدة مع الرصيد)", "ثابتة (مرابحة - شائعة في البنوك الخليجية)"],
+        horizontal=False,
+    )
+
     if loan > 0 and months > 0:
-        if rate > 0:
-            mr = (rate / 100) / 12
-            f = (1 + mr) ** months
-            payment = loan * (mr * f) / (f - 1)
+        if "متناقصة" in method:
+            if rate > 0:
+                mr = (rate / 100) / 12
+                f = (1 + mr) ** months
+                payment = loan * (mr * f) / (f - 1)
+            else:
+                payment = loan / months
         else:
-            payment = loan / months
+            # مرابحة: البنك يحسب ربحاً ثابتاً على كامل المبلغ
+            total_profit_fixed = loan * (rate / 100) * (months / 12)
+            total_fixed = loan + total_profit_fixed
+            payment = total_fixed / months
 
         total = payment * months
         interest = total - loan
@@ -970,8 +1004,10 @@ elif tool_choice == "🏦 القروض والأقساط":
         st.markdown('<hr>', unsafe_allow_html=True)
         c1, c2, c3 = st.columns(3)
         c1.metric("القسط الشهري", money(payment, currency))
-        c2.metric("الفوائد", money(interest, currency))
-        c3.metric("الإجمالي", money(total, currency))
+        c2.metric("إجمالي الفوائد/الربح", money(interest, currency))
+        c3.metric("الإجمالي المسدد", money(total, currency))
+
+        st.caption(f"💡 الطريقة: {'متناقصة' if 'متناقصة' in method else 'مرابحة (ثابتة)'}")
 
         quick_save_button("loan", "قرض", {
             "المبلغ": loan, "القسط": round(payment, 2),
@@ -1019,14 +1055,22 @@ elif tool_choice == "💳 البطاقة الائتمانية":
 elif tool_choice == "🕋 زكاة المال":
     page_header("🕋", "حاسبة الزكاة", "2.5% من المال")
 
-    nisab = st.number_input("النصاب (اختياري):", min_value=0.0, value=0.0, step=100.0)
-    wealth = st.number_input("إجمالي المال:", min_value=0.0, value=10000.0, step=100.0)
+    st.info("💡 النصاب = 85 غرام ذهب. أدخل سعر الغرام لحساب النصاب تلقائياً.")
 
+    col1, col2 = st.columns(2)
+    with col1:
+        gold_price = st.number_input("سعر غرام الذهب:", min_value=0.0, value=280.0, step=5.0)
+    with col2:
+        wealth = st.number_input("إجمالي المال:", min_value=0.0, value=10000.0, step=100.0)
+
+    nisab = gold_price * 85
     zakat = wealth * 0.025
+    st.caption(f"📊 النصاب الحالي: {money(nisab)}")
+
     st.markdown('<hr>', unsafe_allow_html=True)
 
-    if nisab > 0 and wealth < nisab:
-        st.warning("⚠️ أقل من النصاب، لا زكاة.")
+    if wealth < nisab:
+        st.warning(f"⚠️ مالك ({money(wealth)}) أقل من النصاب ({money(nisab)}) - لا زكاة.")
     else:
         st.metric("💰 مقدار الزكاة", money(zakat))
 
@@ -1036,6 +1080,7 @@ elif tool_choice == "🕋 زكاة المال":
                 "حاسبة الزكاة",
                 [
                     ("إجمالي المال", money(wealth)),
+                    ("النصاب", money(nisab)),
                     ("مقدار الزكاة", money(zakat)),
                 ],
                 filename="zakat.pdf",
@@ -1045,6 +1090,7 @@ elif tool_choice == "🕋 زكاة المال":
             quick_print(
                 "حاسبة الزكاة",
                 "إجمالي المال: " + money(wealth) + "\n"
+                "النصاب: " + money(nisab) + "\n"
                 "الزكاة: " + money(zakat)
             )
 
@@ -1079,7 +1125,7 @@ elif tool_choice == "💸 الرواتب":
 # 🛡️ نهاية الخدمة
 # ============================================================
 elif tool_choice == "🛡️ نهاية الخدمة":
-    page_header("🛡️", "نهاية الخدمة + التأمينات", "النظام السعودي")
+    page_header("🛡️", "نهاية الخدمة + التأمينات", "النظام السعودي - محدّث 2026")
 
     currency = st.selectbox("العملة", CURRENCIES, index=0)
     salary = st.number_input(f"الراتب الأخير ({currency})", min_value=0.0, value=5000.0, step=100.0)
@@ -1092,6 +1138,11 @@ elif tool_choice == "🛡️ نهاية الخدمة":
 
     reason = st.radio("السبب:", ["استقالة", "إنهاء"], horizontal=True)
     nationality = st.radio("الجنسية:", ["سعودي", "غير سعودي"], horizontal=True)
+
+    join_date = st.date_input(
+        "تاريخ الالتحاق بالعمل (اختياري - لحساب نسب التأمينات الصحيحة):",
+        value=datetime.date.today() - datetime.timedelta(days=years * 365),
+    )
 
     total_years = years + months / 12
     first5 = min(total_years, 5)
@@ -1108,8 +1159,10 @@ elif tool_choice == "🛡️ نهاية الخدمة":
 
     st.markdown('<hr>', unsafe_allow_html=True)
     if nationality == "سعودي":
-        emp = salary * 0.0975
-        er = salary * 0.1175
+        emp_rate, er_rate = get_gosi_rates(join_date)
+        emp = salary * emp_rate
+        er = salary * er_rate
+        st.caption(f"💡 نسب 2026: الموظف {emp_rate*100:.2f}% | صاحب العمل {er_rate*100:.2f}%")
     else:
         emp = 0
         er = salary * 0.02
@@ -1132,19 +1185,28 @@ elif tool_choice == "👥 تكلفة الموظف":
     page_header("👥", "تكلفة الموظف الإجمالية", "التكلفة الحقيقية السنوية")
 
     currency = st.selectbox("العملة", CURRENCIES, index=0)
-    salary = st.number_input(f"الراتب ({currency})", min_value=0.0, value=5000.0, step=100.0)
+    salary = st.number_input(f"الراتب الأساسي ({currency})", min_value=0.0, value=5000.0, step=100.0)
 
     col1, col2 = st.columns(2)
     with col1:
-        housing = st.number_input(f"سكن ({currency})", min_value=0.0, value=1250.0, step=100.0)
-        transport = st.number_input(f"مواصلات ({currency})", min_value=0.0, value=500.0, step=50.0)
+        housing = st.number_input(f"بدل السكن ({currency})", min_value=0.0, value=1250.0, step=100.0)
+        transport = st.number_input(f"بدل المواصلات ({currency})", min_value=0.0, value=500.0, step=50.0)
     with col2:
         other = st.number_input(f"بدلات أخرى ({currency})", min_value=0.0, value=0.0, step=100.0)
         bonus = st.number_input(f"مكافآت سنوية ({currency})", min_value=0.0, value=0.0, step=500.0)
 
     nationality = st.radio("الجنسية:", ["سعودي", "غير سعودي"], horizontal=True)
+
     total_sal = salary + housing + transport + other
-    gosi = total_sal * 0.1175 if nationality == "سعودي" else total_sal * 0.02
+
+    if nationality == "سعودي":
+        # التأمينات تُحسب على الأساسي + السكن بحد أقصى 45,000
+        gosi_base = min(salary + housing, 45000)
+        _, er_rate = get_gosi_rates()
+        gosi = gosi_base * er_rate
+    else:
+        gosi = total_sal * 0.02
+
     monthly = total_sal + gosi
     annual = (monthly * 12) + bonus
 
@@ -1152,13 +1214,14 @@ elif tool_choice == "👥 تكلفة الموظف":
     c1, c2 = st.columns(2)
     c1.metric("شهرياً", money(monthly, currency))
     c2.metric("سنوياً", money(annual, currency))
+    st.caption(f"💡 التأمينات تُحسب على أساس {money(min(salary + housing, 45000), currency)} (حد أقصى 45,000)")
 
 
 # ============================================================
 # 📅 الدوام الدقيقة
 # ============================================================
 elif tool_choice == "📅 الدوام الدقيقة":
-    page_header("📅", "حاسبة الدوام الدقيقة", "احسب راتبك بالساعات")
+    page_header("📅", "حاسبة الدوام الدقيقة", "احسب راتبك حسب الساعات الفعلية")
 
     currency = st.selectbox("العملة", CURRENCIES, index=0)
     salary = st.number_input(f"الراتب الشهري ({currency})", min_value=0.0, value=5000.0, step=100.0)
@@ -1175,7 +1238,10 @@ elif tool_choice == "📅 الدوام الدقيقة":
     edt = datetime.datetime.combine(ed, etime)
 
     st.markdown('<hr>', unsafe_allow_html=True)
-    if sdt < edt:
+
+    if sdt >= edt:
+        st.error("⚠️ تاريخ/وقت النهاية يجب أن يكون بعد البداية!")
+    else:
         diff = edt - sdt
         secs = diff.total_seconds()
         d = diff.days
@@ -1190,8 +1256,6 @@ elif tool_choice == "📅 الدوام الدقيقة":
         c3.metric("دقائق", m)
         c4.metric("ثواني", s)
         st.success(f"💰 الراتب: **{money(earned, currency)}**")
-    else:
-        st.error("⚠️ تاريخ النهاية بعد البداية!")
 
 
 # ============================================================
@@ -1225,11 +1289,20 @@ elif tool_choice == "🏷️ الخصومات":
     price = st.number_input(f"السعر ({currency})", min_value=0.0, value=100.0, step=10.0)
 
     dtype = st.radio("النوع:", ["نسبة %", "مبلغ ثابت"], horizontal=True)
+
     if dtype == "نسبة %":
         p = st.number_input("النسبة (%)", min_value=0.0, max_value=100.0, value=20.0, step=1.0)
         disc = price * (p / 100)
     else:
-        disc = st.number_input(f"الخصم ({currency})", min_value=0.0, max_value=price, value=20.0, step=5.0)
+        max_val = float(price) if price > 0 else 0.0
+        safe_value = min(20.0, max_val)
+        disc = st.number_input(
+            f"الخصم ({currency})",
+            min_value=0.0,
+            max_value=max_val,
+            value=safe_value,
+            step=5.0,
+        )
 
     st.markdown('<hr>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
@@ -1418,9 +1491,9 @@ elif tool_choice == "⏳ حاسبة العمر":
         c5.metric("الأسابيع", f"{total_weeks:,}")
         c6.metric("الأشهر", f"{y * 12 + m:,}")
 
-        nb = datetime.date(today.year, dob.month, dob.day)
+        nb = safe_date(today.year, dob.month, dob.day)
         if nb < today:
-            nb = datetime.date(today.year + 1, dob.month, dob.day)
+            nb = safe_date(today.year + 1, dob.month, dob.day)
         dtb = (nb - today).days
 
         if dtb == 0:
@@ -1871,6 +1944,8 @@ elif tool_choice == "🎨 مولّد الشعار":
 elif tool_choice == "📞 حاسبة الاتصال الدولي":
     page_header("📞", "حاسبة الاتصال الدولي", "احسب تكلفة مكالماتك الدولية")
 
+    st.warning("⚠️ الأسعار المعروضة تقريبية وقد تختلف حسب مزوّد الخدمة والباقة.")
+
     minutes = st.number_input("عدد الدقائق", min_value=1, value=10, step=1)
 
     countries = {
@@ -2055,18 +2130,19 @@ elif tool_choice == "📄 القوالب الجاهزة":
 elif tool_choice == "📜 سياسة الخصوصية":
     page_header("📜", "سياسة الخصوصية", "التزاماتنا تجاهك")
 
-    st.info("🔒 جميع العمليات تُحسب محلياً في متصفحك.")
+    st.info("🔒 جميع العمليات تُحسب محلياً في جلسة المتصفح.")
 
     st.subheader("📋 التزاماتنا:")
     st.markdown(
         "- ✅ لا نجمع بيانات شخصية.\n"
         "- ✅ لا نستخدم تتبع أو إعلانات.\n"
-        "- ✅ البيانات مؤقتة وتُمسح بإغلاق الصفحة.\n"
-        "- ✅ الأداة للأغراض التعليمية.\n"
+        "- ✅ البيانات مؤقتة في جلسة الجلسة وتُمسح بإغلاق الصفحة.\n"
+        "- ✅ ننصح بحفظ نسخة احتياطية دورية من قسم النسخ الاحتياطي.\n"
+        "- ✅ الأداة للأغراض التعليمية والإرشادية.\n"
     )
 
     st.subheader("⚠️ إخلاء المسؤولية:")
-    st.warning("النتائج إرشادية فقط. راجع مختصاً مالياً للقرارات المهمة.")
+    st.warning("النتائج إرشادية فقط. راجع مختصاً مالياً أو محاسبياً قانونياً للقرارات المهمة.")
 
     st.markdown('<hr>', unsafe_allow_html=True)
     st.write("**📧 للتواصل:** admin@smart-merchant-tools.com")
