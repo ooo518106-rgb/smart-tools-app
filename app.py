@@ -470,10 +470,10 @@ elif tool_choice == "💳 رسوم تابي وتمارا":
     )
 
     quick_save_button("tamara", "تابي/تمارا", {
-        "الس       عر": price,
-        "العمولة": " round(fee_amount, 2الص),
-        "الضريافيبة": round(vat_amount,": round 2),
-(net, 2),
+        "السعر": price,
+        "العمولة": round(fee_amount, 2),
+        "الضريبة": round(vat_amount, 2),
+        "الصافي": round(net, 2),
         "العملة": currency,
     })
 
