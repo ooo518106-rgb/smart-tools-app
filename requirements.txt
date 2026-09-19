@@ -4,3 +4,4 @@ python-dateutil
 qrcode[pil]
 openpyxl
 requests
+hijri-converter
