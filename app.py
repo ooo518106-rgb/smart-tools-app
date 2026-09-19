@@ -1,7 +1,378 @@
+import streamlit as st
+import datetime
+import pandas as pd
+import urllib.parse
+from io import BytesIO
 
+from helpers import (
+    money, save_result, quick_save_button, copy_box,
+    export_to_excel, page_header, share_buttons,
+    fetch_currency_rates, currency_label,
+    check_pin, render_reminders,
+)
+
+try:
+    from dateutil.relativedelta import relativedelta
+    HAS_DATEUTIL = True
+except ImportError:
+    HAS_DATEUTIL = False
+
+try:
+    import qrcode
+    HAS_QR = True
+except ImportError:
+    HAS_QR = False
+
+st.set_page_config(
+    page_title="أدوات التاجر الذكي",
+    page_icon="💼",
+    layout="centered",
+    initial_sidebar_state="expanded",
+)
+
+defaults = {
+    "ecommerce_history": [],
+    "all_results": [],
+    "theme": "فاتح",
+    "search_query": "",
+    "reminders": [],
+    "pin_ok": False,
+}
+for k, v in defaults.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
+
+
+def apply_theme(theme_name):
+    themes = {
+        "فاتح": {
+            "bg": "linear-gradient(135deg, #eef2ff 0%, #fce7f3 100%)",
+            "card": "rgba(255, 255, 255, 0.85)",
+            "accent": "#6366f1",
+            "accent2": "#ec4899",
+            "text": "#1e293b",
+            "sub": "#64748b",
+            "sidebar1": "#4f46e5",
+            "sidebar2": "#7c3aed",
+            "field_bg": "rgba(255, 255, 255, 0.95)",
+            "field_border": "#e2e8f0",
+            "field_text": "#1e293b",
+            "border": "rgba(99, 102, 241, 0.15)",
+        },
+        "داكن": {
+            "bg": "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
+            "card": "rgba(30, 41, 59, 0.85)",
+            "accent": "#818cf8",
+            "accent2": "#f472b6",
+            "text": "#e2e8f0",
+            "sub": "#94a3b8",
+            "sidebar1": "#1e1b4b",
+            "sidebar2": "#312e81",
+            "field_bg": "rgba(30, 41, 59, 0.9)",
+            "field_border": "#334155",
+            "field_text": "#e2e8f0",
+            "border": "rgba(129, 140, 248, 0.2)",
+        },
+        "غروب": {
+            "bg": "linear-gradient(135deg, #fff7ed 0%, #fee2e2 100%)",
+            "card": "rgba(255, 255, 255, 0.85)",
+            "accent": "#ea580c",
+            "accent2": "#dc2626",
+            "text": "#7c2d12",
+            "sub": "#9a3412",
+            "sidebar1": "#c2410c",
+            "sidebar2": "#ea580c",
+            "field_bg": "rgba(255, 255, 255, 0.95)",
+            "field_border": "#fed7aa",
+            "field_text": "#7c2d12",
+            "border": "rgba(234, 88, 12, 0.15)",
+        },
+        "محيط": {
+            "bg": "linear-gradient(135deg, #ecfeff 0%, #cffafe 100%)",
+            "card": "rgba(255, 255, 255, 0.85)",
+            "accent": "#0891b2",
+            "accent2": "#06b6d4",
+            "text": "#164e63",
+            "sub": "#155e75",
+            "sidebar1": "#0e7490",
+            "sidebar2": "#0891b2",
+            "field_bg": "rgba(255, 255, 255, 0.95)",
+            "field_border": "#a5f3fc",
+            "field_text": "#164e63",
+            "border": "rgba(8, 145, 178, 0.15)",
+        },
+        "غابة": {
+            "bg": "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)",
+            "card": "rgba(255, 255, 255, 0.85)",
+            "accent": "#059669",
+            "accent2": "#10b981",
+            "text": "#064e3b",
+            "sub": "#065f46",
+            "sidebar1": "#047857",
+            "sidebar2": "#059669",
+            "field_bg": "rgba(255, 255, 255, 0.95)",
+            "field_border": "#a7f3d0",
+            "field_text": "#064e3b",
+            "border": "rgba(5, 150, 105, 0.15)",
+        },
+    }
+
+    th = themes.get(theme_name, themes["فاتح"])
+
+    st.markdown(f"""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap');
+* {{ font-family: 'Cairo', sans-serif; }}
+html, body, [class*="css"] {{ font-family: 'Cairo', sans-serif; }}
+.stApp {{ background: {th['bg']}; background-attachment: fixed; }}
+footer {{visibility: hidden;}}
+#MainMenu {{visibility: hidden;}}
+[data-testid="stStatusWidget"] {{visibility: hidden;}}
+
+.page-hero {{ text-align: center; padding: 20px 10px 24px; margin-bottom: 12px; }}
+.page-hero-icon {{ font-size: 3.2rem; margin-bottom: 8px; display: inline-block; }}
+.page-title {{
+    background: linear-gradient(135deg, {th['sidebar1']} 0%, {th['accent2']} 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-size: 1.9rem;
+    font-weight: 900;
+    margin: 0;
+    padding: 0;
+    letter-spacing: -0.5px;
+}}
+.page-subtitle {{ color: {th['sub']}; font-size: 0.9rem; margin: 8px 0 0; font-weight: 500; }}
+.section-title {{
+    color: {th['text']};
+    font-size: 1.3rem;
+    font-weight: 800;
+    margin: 24px 0 12px;
+    padding-right: 10px;
+    border-right: 4px solid {th['accent']};
+}}
+
+.stat-grid {{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+}}
+.stat-card {{
+    background: {th['card']};
+    backdrop-filter: blur(10px);
+    padding: 18px 16px;
+    border-radius: 20px;
+    border: 1px solid {th['border']};
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+    text-align: center;
+}}
+.stat-icon {{ font-size: 1.8rem; margin-bottom: 6px; }}
+.stat-value {{
+    font-size: 1.8rem;
+    font-weight: 900;
+    background: linear-gradient(135deg, {th['sidebar1']}, {th['accent2']});
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1.1;
+}}
+.stat-label {{ color: {th['sub']}; font-size: 0.8rem; font-weight: 600; margin-top: 4px; }}
+
+[data-testid="stMetric"] {{
+    background: {th['card']};
+    backdrop-filter: blur(10px);
+    padding: 16px 14px;
+    border-radius: 18px;
+    border: 1px solid {th['border']};
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
+}}
+[data-testid="stMetricLabel"] {{
+    color: {th['sub']} !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+}}
+[data-testid="stMetricValue"] {{
+    color: {th['text']} !important;
+    font-weight: 800 !important;
+}}
+
+section[data-testid="stSidebar"] {{
+    background: linear-gradient(180deg, {th['sidebar1']} 0%, {th['sidebar2']} 100%);
+}}
+section[data-testid="stSidebar"] * {{ color: #ffffff !important; }}
+section[data-testid="stSidebar"] .stRadio label {{
+    background: rgba(255, 255, 255, 0.08);
+    padding: 10px 14px;
+    border-radius: 12px;
+    margin-bottom: 5px;
+    cursor: pointer;
+    display: block;
+    font-size: 0.88rem;
+    font-weight: 500;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}}
+section[data-testid="stSidebar"] .stRadio label:hover {{
+    background: rgba(255, 255, 255, 0.18);
+}}
+section[data-testid="stSidebar"] input,
+section[data-testid="stSidebar"] textarea {{
+    background: rgba(255, 255, 255, 0.12) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    border-radius: 10px !important;
+}}
+
+.stButton > button {{
+    background: linear-gradient(135deg, {th['sidebar1']} 0%, {th['accent2']} 100%);
+    color: white !important;
+    border: none;
+    border-radius: 14px;
+    padding: 12px 20px;
+    font-weight: 700;
+    width: 100%;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}}
+.stDownloadButton > button {{
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white !important;
+    border: none;
+    border-radius: 14px;
+    padding: 12px 20px;
+    font-weight: 700;
+    width: 100%;
+}}
+
+.stTextInput input, .stNumberInput input, .stTextArea textarea {{
+    border-radius: 12px !important;
+    border: 1.5px solid {th['field_border']} !important;
+    background: {th['field_bg']} !important;
+    color: {th['field_text']} !important;
+    padding: 10px 14px !important;
+}}
+.stSelectbox > div > div {{
+    border-radius: 12px !important;
+    border: 1.5px solid {th['field_border']} !important;
+}}
+.stAlert {{ border-radius: 14px !important; border: none !important; }}
+h1, h2, h3, h4 {{ color: {th['text']} !important; }}
+
+div[data-testid="stDataFrame"] {{
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid {th['border']};
+}}
+div[data-testid="stExpander"] {{
+    border-radius: 14px !important;
+    border: 1px solid {th['border']} !important;
+    background: {th['card']} !important;
+}}
+.share-btn {{
+    display: block;
+    text-align: center;
+    padding: 12px 8px;
+    border-radius: 12px;
+    color: white !important;
+    font-weight: 700;
+    text-decoration: none !important;
+    font-size: 0.9rem;
+}}
+.share-btn:hover {{ color: white !important; }}
+hr {{ border-color: {th['border']} !important; margin: 20px 0 !important; }}
+</style>
+""", unsafe_allow_html=True)
+
+
+st.markdown("""
+<link rel="manifest" href="./app/static/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="أدوات التاجر">
+<meta name="theme-color" content="#4f46e5">
+""", unsafe_allow_html=True)
+
+if not check_pin():
+    st.stop()
+
+apply_theme(st.session_state.theme)
+
+st.sidebar.markdown("### 💼 أدوات التاجر الذكي")
+
+search_query = st.sidebar.text_input(
+    "🔍 ابحث",
+    value=st.session_state.search_query,
+    placeholder="ابحث عن أداة...",
+)
+st.session_state.search_query = search_query
+
+theme_options = ["☀️ فاتح", "🌙 داكن", "🌅 غروب", "🌊 محيط", "🌲 غابة"]
+theme_names = ["فاتح", "داكن", "غروب", "محيط", "غابة"]
+default_idx = 0
+for i, name in enumerate(theme_names):
+    if name == st.session_state.theme:
+        default_idx = i
+        break
+
+theme_pick = st.sidebar.selectbox("🎨 الثيم", theme_options, index=default_idx)
+theme_key = theme_pick.split()[-1]
+if theme_key != st.session_state.theme:
+    st.session_state.theme = theme_key
+    st.rerun()
+
+st.sidebar.markdown("---")
+
+ALL_TOOLS = [
+    "🏠 الرئيسية",
+    "📊 لوحة التقارير",
+    "📦 التجارة الإلكترونية",
+    "💳 تابي وتمارا",
+    "🏪 عمولة المنصات",
+    "📢 الإعلانات ROAS",
+    "💬 روابط واتساب",
+    "🏦 القروض والأقساط",
+    "💳 البطاقة الائتمانية",
+    "🕋 زكاة المال",
+    "💸 الرواتب",
+    "🛡️ نهاية الخدمة",
+    "👥 تكلفة الموظف",
+    "📅 الدوام الدقيقة",
+    "⚖️ توزيع الشحن",
+    "🏷️ الخصومات",
+    "🎁 العروض الترويجية",
+    "📦 نقطة إعادة الطلب",
+    "📈 نمو المبيعات",
+    "📊 LTV / CAC",
+    "⏳ حاسبة العمر",
+    "📉 نقطة التعادل",
+    "🧾 ضريبة VAT",
+    "📈 أرباح الكريبتو",
+    "🛡️ إدارة المخاطر",
+    "💱 محول العملات",
+    "🗓️ أيام العمل",
+    "📅 أرقام الفواتير",
+    "🔲 مولد QR",
+    "📄 القوالب الجاهزة",
+    "📜 سياسة الخصوصية",
+]
+
+if search_query.strip():
+    filtered = [x for x in ALL_TOOLS if search_query.lower().strip() in x.lower()]
+else:
+    filtered = ALL_TOOLS
+
+tool_choice = "🏠 الرئيسية"
+if not filtered:
+    st.sidebar.warning("لا توجد نتائج")
+else:
+    tool_choice = st.sidebar.radio("الأدوات", filtered)
+
+if st.session_state.all_results:
+    st.sidebar.markdown("---")
+    st.sidebar.markdown(f"**📊 {len(st.session_state.all_results)} عملية محفوظة**")
+
+CURRENCIES = ["ر.س", "د.إ", "د.ك", "ر.ع", "ج.م", "$", "€", "£"]
 
 # ============================================================
-# 🏠 الرئيسية — تصميم جديد
+# 🏠 الرئيسية
 # ============================================================
 if tool_choice == "🏠 الرئيسية":
     page_header("💼", "أدوات التاجر الذكي", "مجموعتك المتكاملة للحسابات التجارية والمالية")
@@ -12,7 +383,7 @@ if tool_choice == "🏠 الرئيسية":
         '<div class="stat-grid">'
         '<div class="stat-card">'
         '<div class="stat-icon">🛠️</div>'
-        '<div class="stat-value">30</div>'
+        '<div class="stat-value">31</div>'
         '<div class="stat-label">أداة متاحة</div>'
         '</div>'
         '<div class="stat-card">'
@@ -29,31 +400,7 @@ if tool_choice == "🏠 الرئيسية":
         unsafe_allow_html=True,
     )
 
-    st.markdown(
-        '<h2 class="section-title">🚀 ابدأ من هنا</h2>',
-        unsafe_allow_html=True,
-    )
-
-    featured = [
-        ("📊", "لوحة التقارير", "📊 لوحة التقارير"),
-        ("📦", "حاسبة التجارة", "📦 التجارة الإلكترونية"),
-        ("🏪", "عمولة المنصات", "🏪 عمولة المنصات"),
-        ("📢", "حاسبة الإعلانات", "📢 الإعلانات ROAS"),
-        ("💱", "محول العملات", "💱 محول العملات"),
-        ("🕋", "حاسبة الزكاة", "🕋 زكاة المال"),
-    ]
-
-    cols = st.columns(3)
-    for i, (icon, name, tool) in enumerate(featured):
-        with cols[i % 3]:
-            if st.button(f"{icon}  {name}", key=f"feat_{i}", use_container_width=True):
-                st.session_state.search_query = ""
-                st.rerun()
-
-    st.markdown(
-        '<h2 class="section-title">📂 جميع الأدوات</h2>',
-        unsafe_allow_html=True,
-    )
+    st.markdown('<h2 class="section-title">🚀 ابدأ من هنا</h2>', unsafe_allow_html=True)
 
     categories = {
         "💰 محاسبات التجارة": [
@@ -100,19 +447,17 @@ if tool_choice == "🏠 الرئيسية":
     }
 
     for cat_name, tools in categories.items():
-        with st.expander(cat_name, expanded=False):
-            for t in tools:
-                if st.button(t, key=f"cat_{cat_name}_{t}", use_container_width=True):
+        st.markdown(f'<h3 style="margin-top:20px; color:#6366f1;">{cat_name}</h3>', unsafe_allow_html=True)
+        cols = st.columns(2)
+        for i, t in enumerate(tools):
+            with cols[i % 2]:
+                if st.button(t, key=f"home_{cat_name}_{t}", use_container_width=True):
                     st.session_state.search_query = ""
-                    if t in ALL_TOOLS:
-                        st.session_state.selected_tool = t
+                    st.session_state.force_tool = t
                     st.rerun()
 
     if total_ops > 0:
-        st.markdown(
-            '<h2 class="section-title">📈 آخر العمليات</h2>',
-            unsafe_allow_html=True,
-        )
+        st.markdown('<h2 class="section-title">📈 آخر العمليات</h2>', unsafe_allow_html=True)
         recent = st.session_state.all_results[-5:][::-1]
         for r in recent:
             with st.expander(f"• {r.get('الأداة', 'عملية')} — {r.get('التاريخ', '')}"):
@@ -129,44 +474,19 @@ elif tool_choice == "📊 لوحة التقارير":
     page_header("📊", "لوحة التقارير", "جميع نتائجك المحفوظة في مكان واحد")
 
     if not st.session_state.all_results:
-        st.markdown(
-            '<div class="empty-state">'
-            '<div style="font-size:2.5rem; margin-bottom:8px;">📭</div>'
-            '<div style="font-weight:600;">لا توجد نتائج محفوظة بعد</div>'
-            '<div style="font-size:0.8rem; margin-top:4px;">ابدأ باستخدام الحاسبات واحفظ النتائج</div>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
+        st.info("📭 لا توجد نتائج محفوظة بعد. ابدأ باستخدام الحاسبات واحفظ النتائج.")
     else:
         df_all = pd.DataFrame(st.session_state.all_results)
 
-        st.markdown(
-            '<div class="stat-grid">'
-            '<div class="stat-card">'
-            '<div class="stat-icon">📊</div>'
-            '<div class="stat-value">' + str(len(df_all)) + '</div>'
-            '<div class="stat-label">إجمالي العمليات</div>'
-            '</div>'
-            '<div class="stat-card">'
-            '<div class="stat-icon">🛠️</div>'
-            '<div class="stat-value">' + str(df_all["الأداة"].nunique()) + '</div>'
-            '<div class="stat-label">أدوات مستخدمة</div>'
-            '</div>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
+        c1, c2, c3 = st.columns(3)
+        c1.metric("📊 إجمالي العمليات", len(df_all))
+        c2.metric("🛠️ أدوات مستخدمة", df_all["الأداة"].nunique())
+        c3.metric("📅 أول عملية", df_all["التاريخ"].iloc[0].split()[0])
 
-        st.markdown(
-            '<h2 class="section-title">📋 السجل الكامل</h2>',
-            unsafe_allow_html=True,
-        )
+        st.markdown('<hr>', unsafe_allow_html=True)
         st.dataframe(df_all, use_container_width=True, hide_index=True)
 
-        st.markdown(
-            '<h2 class="section-title">📊 إحصائيات</h2>',
-            unsafe_allow_html=True,
-        )
-
+        st.markdown('<h2 class="section-title">📊 إحصائيات</h2>', unsafe_allow_html=True)
         tool_counts = df_all["الأداة"].value_counts()
         st.bar_chart(tool_counts)
 
@@ -189,39 +509,23 @@ elif tool_choice == "📊 لوحة التقارير":
             c2.metric("الشهر الماضي", prev_m)
             c3.metric("التغيير", f"{diff:+d}", delta=f"{pct:+.1f}%")
 
-        st.markdown(
-            '<h2 class="section-title">📥 التصدير</h2>',
-            unsafe_allow_html=True,
-        )
+        st.markdown('<h2 class="section-title">📥 التصدير</h2>', unsafe_allow_html=True)
 
         col1, col2, col3 = st.columns(3)
-
         with col1:
             csv_all = df_all.to_csv(index=False).encode("utf-8-sig")
-            st.download_button(
-                "📥 CSV",
-                data=csv_all,
-                file_name="Report.csv",
-                mime="text/csv",
-                use_container_width=True,
-            )
-
+            st.download_button("📥 CSV", data=csv_all, file_name="Report.csv", mime="text/csv", use_container_width=True)
         with col2:
             sheets = {"الكل": df_all}
             for tool in df_all["الأداة"].unique():
-                sub = df_all[df_all["الأداة"] == tool]
-                sheets[tool[:28]] = sub
-
+                sheets[tool[:28]] = df_all[df_all["الأداة"] == tool]
             excel_bytes = export_to_excel(sheets, "Merchant_Report.xlsx")
             if excel_bytes:
                 st.download_button(
-                    "📥 Excel",
-                    data=excel_bytes,
-                    file_name="Merchant_Report.xlsx",
+                    "📥 Excel", data=excel_bytes, file_name="Merchant_Report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True,
                 )
-
         with col3:
             if st.button("🗑️ مسح الكل", use_container_width=True):
                 st.session_state.all_results = []
@@ -233,7 +537,7 @@ elif tool_choice == "📊 لوحة التقارير":
 # ============================================================
 # 📦 التجارة الإلكترونية
 # ============================================================
-if tool_choice == "🏠 الرئيسية":
+elif tool_choice == "📦 التجارة الإلكترونية":
     page_header("📦", "حاسبة التجارة الإلكترونية", "احسب هوامش الربح الصافية")
 
     currency = st.selectbox("العملة", CURRENCIES, index=0)
@@ -254,7 +558,6 @@ if tool_choice == "🏠 الرئيسية":
     margin = (net_profit / selling_price * 100) if selling_price > 0 else 0
 
     st.markdown('<hr>', unsafe_allow_html=True)
-
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("التكلفة", money(total_cost, currency))
     c2.metric("رسوم الدفع", money(gateway_fees, currency))
@@ -301,20 +604,6 @@ if tool_choice == "🏠 الرئيسية":
         df_hist = pd.DataFrame(st.session_state.ecommerce_history)
         st.dataframe(df_hist, use_container_width=True, hide_index=True)
 
-        col_a, col_b = st.columns(2)
-        with col_a:
-            st.download_button(
-                "📥 CSV",
-                data=df_hist.to_csv(index=False).encode("utf-8-sig"),
-                file_name="products.csv",
-                mime="text/csv",
-                use_container_width=True,
-            )
-        with col_b:
-            if st.button("🗑️ مسح السجل", use_container_width=True):
-                st.session_state.ecommerce_history = []
-                st.rerun()
-
 
 # ============================================================
 # 💳 تابي وتمارا
@@ -339,23 +628,16 @@ elif tool_choice == "💳 تابي وتمارا":
     net = price - total_deduction
 
     st.markdown('<hr>', unsafe_allow_html=True)
-
     c1, c2, c3 = st.columns(3)
     c1.metric("العمولة", money(fee_amount, currency))
     c2.metric("الضريبة", money(vat_amount, currency))
     c3.metric("الصافي", money(net, currency))
 
-    share_buttons(
-        f"💳 الصافي بعد تابي/تمارا: {money(net, currency)}\n"
-        f"من تطبيق أدوات التاجر الذكي"
-    )
+    share_buttons(f"💳 الصافي بعد تابي/تمارا: {money(net, currency)}\nمن تطبيق أدوات التاجر الذكي")
 
     quick_save_button("tamara", "تابي/تمارا", {
-        "السعر": price,
-        "العمولة": round(fee_amount, 2),
-        "الضريبة": round(vat_amount, 2),
-        "الصافي": round(net, 2),
-        "العملة": currency,
+        "السعر": price, "العمولة": round(fee_amount, 2),
+        "الضريبة": round(vat_amount, 2), "الصافي": round(net, 2), "العملة": currency,
     })
 
 
@@ -367,8 +649,7 @@ elif tool_choice == "🏪 عمولة المنصات":
 
     currency = st.selectbox("العملة", CURRENCIES, index=0)
     platform = st.selectbox("المنصة", ["سلة", "زد", "شوبيفاي", "مخصصة"])
-
-    platform_defaults = {"سلة": (2.0, 2.5), "زد": (2.0, 2.5), "شوبيفاي": (2.9, 2.9), "مخصصة": (0.0, 0.0)}
+    pd_defaults = {"سلة": (2.0, 2.5), "زد": (2.0, 2.5), "شوبيفاي": (2.9, 2.9), "مخصصة": (0.0, 0.0)}
 
     price = st.number_input(f"السعر ({currency})", min_value=0.0, value=100.0, step=1.0)
     product_cost = st.number_input(f"تكلفة المنتج ({currency})", min_value=0.0, value=40.0, step=1.0)
@@ -376,9 +657,9 @@ elif tool_choice == "🏪 عمولة المنصات":
 
     col1, col2 = st.columns(2)
     with col1:
-        commission = st.number_input("عمولة المنصة (%)", min_value=0.0, value=platform_defaults[platform][0], step=0.1)
+        commission = st.number_input("عمولة المنصة (%)", min_value=0.0, value=pd_defaults[platform][0], step=0.1)
     with col2:
-        payment = st.number_input("رسوم الدفع (%)", min_value=0.0, value=platform_defaults[platform][1], step=0.1)
+        payment = st.number_input("رسوم الدفع (%)", min_value=0.0, value=pd_defaults[platform][1], step=0.1)
 
     payment_fixed = st.number_input(f"دفع ثابت ({currency})", min_value=0.0, value=1.0, step=0.5)
     vat = st.number_input("ضريبة (%)", min_value=0.0, value=15.0, step=1.0)
@@ -390,28 +671,18 @@ elif tool_choice == "🏪 عمولة المنصات":
     net_profit = price - product_cost - shipping - total_deductions
 
     st.markdown('<hr>', unsafe_allow_html=True)
-
     c1, c2, c3 = st.columns(3)
     c1.metric("عمولة المنصة", money(platform_fee, currency))
     c2.metric("رسوم الدفع", money(payment_amount, currency))
     c3.metric("الضريبة", money(vat_amount, currency))
-
     c4, c5, c6 = st.columns(3)
     c4.metric("إجمالي الخصم", money(total_deductions, currency))
     c5.metric("الصافي", money(price - total_deductions, currency))
     c6.metric("الربح", money(net_profit, currency), delta="ربح" if net_profit > 0 else "خسارة")
 
-    share_buttons(
-        f"🏪 نتيجة عمولة {platform}:\n"
-        f"الربح الصافي: {money(net_profit, currency)}\n"
-        f"من تطبيق أدوات التاجر الذكي"
-    )
-
     quick_save_button("platform", f"عمولة {platform}", {
-        "المنصة": platform,
-        "السعر": price,
-        "الربح الصافي": round(net_profit, 2),
-        "العملة": currency,
+        "المنصة": platform, "السعر": price,
+        "الربح الصافي": round(net_profit, 2), "العملة": currency,
     })
 
 
@@ -441,19 +712,16 @@ elif tool_choice == "📢 الإعلانات ROAS":
     max_cpa = aov * (margin_percent / 100)
 
     st.markdown('<hr>', unsafe_allow_html=True)
-
     c1, c2, c3 = st.columns(3)
     c1.metric("الإيراد", money(revenue, currency))
     c2.metric("ROAS", f"{roas:.2f}x")
     c3.metric("CPA", money(cpa, currency))
-
     c4, c5, c6 = st.columns(3)
     c4.metric("ربح إجمالي", money(gross_profit, currency))
     c5.metric("ربح صافي", money(net_profit, currency), delta="ربح" if net_profit > 0 else "خسارة")
     c6.metric("أقصى CPA", money(max_cpa, currency))
 
     st.info(f"🎯 ROAS التعادل: **{breakeven_roas:.2f}x**")
-
     if roas < breakeven_roas:
         st.error("⚠️ حملة خاسرة!")
     elif roas < breakeven_roas * 1.5:
@@ -461,19 +729,9 @@ elif tool_choice == "📢 الإعلانات ROAS":
     else:
         st.success("🎉 حملة مربحة!")
 
-    share_buttons(
-        f"📢 نتيجة حاسبة الإعلانات:\n"
-        f"ROAS: {roas:.2f}x\n"
-        f"الربح الصافي: {money(net_profit, currency)}\n"
-        f"من تطبيق أدوات التاجر الذكي"
-    )
-
     quick_save_button("roas", "الإعلانات", {
-        "الإنفاق": ad_spend,
-        "الإيراد": revenue,
-        "ROAS": round(roas, 2),
-        "الربح الصافي": round(net_profit, 2),
-        "العملة": currency,
+        "الإنفاق": ad_spend, "الإيراد": revenue, "ROAS": round(roas, 2),
+        "الربح الصافي": round(net_profit, 2), "العملة": currency,
     })
 
 
@@ -524,26 +782,16 @@ elif tool_choice == "🏦 القروض والأقساط":
         interest = total - loan
 
         st.markdown('<hr>', unsafe_allow_html=True)
-
         c1, c2, c3 = st.columns(3)
         c1.metric("القسط الشهري", money(payment, currency))
         c2.metric("الفوائد", money(interest, currency))
         c3.metric("الإجمالي", money(total, currency))
 
-        share_buttons(
-            f"🏦 القسط الشهري: {money(payment, currency)}\n"
-            f"الإجمالي: {money(total, currency)}\n"
-            f"من تطبيق أدوات التاجر الذكي"
-        )
-
         quick_save_button("loan", "قرض", {
-            "المبلغ": loan,
-            "القسط": round(payment, 2),
-            "الفوائد": round(interest, 2),
-            "الأشهر": months,
-            "العملة": currency,
+            "المبلغ": loan, "القسط": round(payment, 2),
+            "الفوائد": round(interest, 2), "الأشهر": months, "العملة": currency,
         })
-        
+
 
 # ============================================================
 # 💳 البطاقة الائتمانية
@@ -557,7 +805,6 @@ elif tool_choice == "💳 البطاقة الائتمانية":
     payment = st.number_input(f"الدفعة الشهرية ({currency})", min_value=1.0, value=300.0, step=50.0)
 
     mr = (rate / 100) / 12
-
     if payment <= balance * mr:
         st.error("⚠️ الدفعة أقل من الفائدة الشهرية!")
     else:
@@ -590,16 +837,12 @@ elif tool_choice == "🕋 زكاة المال":
     wealth = st.number_input("إجمالي المال:", min_value=0.0, value=10000.0, step=100.0)
 
     zakat = wealth * 0.025
-
     st.markdown('<hr>', unsafe_allow_html=True)
 
     if nisab > 0 and wealth < nisab:
         st.warning("⚠️ أقل من النصاب، لا زكاة.")
     else:
         st.metric("💰 مقدار الزكاة", money(zakat))
-        share_buttons(
-            f"🕋 مقدار الزكاة: {money(zakat)}\nمن تطبيق أدوات التاجر الذكي"
-        )
         quick_save_button("zakat", "زكاة", {"المال": wealth, "الزكاة": round(zakat, 2)})
 
 
@@ -607,7 +850,7 @@ elif tool_choice == "🕋 زكاة المال":
 # 💸 الرواتب
 # ============================================================
 elif tool_choice == "💸 الرواتب":
-    page_header("💸", "حاسبة الرواتب", "احسب الراتب المستحق بدقة")
+    page_header("💸", "حاسبة الرواتب", "احسب الراتب المستحق")
 
     currency = st.selectbox("العملة", CURRENCIES, index=0)
     basic = st.number_input(f"الراتب الأساسي ({currency})", min_value=0.0, value=5000.0, step=100.0)
@@ -619,7 +862,6 @@ elif tool_choice == "💸 الرواتب":
         deduct = st.number_input(f"الخصومات ({currency})", min_value=0.0, value=0.0, step=100.0)
 
     net = basic + allow - deduct
-
     st.markdown('<hr>', unsafe_allow_html=True)
 
     if net < 0:
@@ -671,15 +913,11 @@ elif tool_choice == "🛡️ نهاية الخدمة":
     c1, c2 = st.columns(2)
     c1.metric("حصة الموظف", money(emp, currency))
     c2.metric("حصة صاحب العمل", money(er, currency))
-
     st.metric("💰 المكافأة", money(gratuity, currency))
 
     quick_save_button("end_service", "نهاية خدمة", {
-        "الراتب": salary,
-        "السنوات": total_years,
-        "المكافأة": round(gratuity, 2),
-        "السبب": reason,
-        "العملة": currency,
+        "الراتب": salary, "السنوات": total_years,
+        "المكافأة": round(gratuity, 2), "السبب": reason, "العملة": currency,
     })
 
 
@@ -701,7 +939,6 @@ elif tool_choice == "👥 تكلفة الموظف":
         bonus = st.number_input(f"مكافآت سنوية ({currency})", min_value=0.0, value=0.0, step=500.0)
 
     nationality = st.radio("الجنسية:", ["سعودي", "غير سعودي"], horizontal=True)
-
     total_sal = salary + housing + transport + other
     gosi = total_sal * 0.1175 if nationality == "سعودي" else total_sal * 0.02
     monthly = total_sal + gosi
@@ -734,7 +971,6 @@ elif tool_choice == "📅 الدوام الدقيقة":
     edt = datetime.datetime.combine(ed, etime)
 
     st.markdown('<hr>', unsafe_allow_html=True)
-
     if sdt < edt:
         diff = edt - sdt
         secs = diff.total_seconds()
@@ -768,7 +1004,6 @@ elif tool_choice == "⚖️ توزيع الشحن":
     if total > 0:
         ratio = expenses / total
         item_exp = item * ratio
-
         st.markdown('<hr>', unsafe_allow_html=True)
         c1, c2, c3 = st.columns(3)
         c1.metric("النسبة", f"{ratio * 100:.2f}%")
@@ -786,7 +1021,6 @@ elif tool_choice == "🏷️ الخصومات":
     price = st.number_input(f"السعر ({currency})", min_value=0.0, value=100.0, step=10.0)
 
     dtype = st.radio("النوع:", ["نسبة %", "مبلغ ثابت"], horizontal=True)
-
     if dtype == "نسبة %":
         p = st.number_input("النسبة (%)", min_value=0.0, max_value=100.0, value=20.0, step=1.0)
         disc = price * (p / 100)
@@ -803,7 +1037,7 @@ elif tool_choice == "🏷️ الخصومات":
 # 🎁 العروض الترويجية
 # ============================================================
 elif tool_choice == "🎁 العروض الترويجية":
-    page_header("🎁", "حاسبة العروض الترويجية", "هل عرضك مربح؟")
+    page_header("🎁", "حاسبة العروض", "هل عرضك مربح؟")
 
     currency = st.selectbox("العملة", CURRENCIES, index=0)
     offer = st.selectbox("نوع العرض", ["اشترِ X واحصل Y", "خصم على الثاني", "خصم كمية", "منتج مجاني"])
@@ -900,11 +1134,9 @@ elif tool_choice == "📈 نمو المبيعات":
     years = st.number_input("السنوات", min_value=1, value=3, step=1)
 
     st.markdown('<hr>', unsafe_allow_html=True)
-
     if start > 0:
         cagr = ((end / start) ** (1 / years) - 1) * 100
         total = ((end - start) / start) * 100
-
         c1, c2 = st.columns(2)
         c1.metric("CAGR", f"{cagr:.2f}%")
         c2.metric("النمو الإجمالي", f"{total:.2f}%")
@@ -947,12 +1179,8 @@ elif tool_choice == "⏳ حاسبة العمر":
     page_header("⏳", "حاسبة العمر الدقيقة", "احسب عمرك بالسنوات والأيام")
 
     today = datetime.date.today()
-    dob = st.date_input(
-        "تاريخ الميلاد:",
-        value=datetime.date(2000, 1, 1),
-        min_value=datetime.date(1900, 1, 1),
-        max_value=today,
-    )
+    dob = st.date_input("تاريخ الميلاد:", value=datetime.date(2000, 1, 1),
+                         min_value=datetime.date(1900, 1, 1), max_value=today)
 
     if dob <= today:
         total_days = (today - dob).days
@@ -976,13 +1204,11 @@ elif tool_choice == "⏳ حاسبة العمر":
                 m += 12
 
         st.markdown('<hr>', unsafe_allow_html=True)
-
         c1, c2, c3 = st.columns(3)
         c1.metric("سنة", y)
         c2.metric("شهر", m)
         c3.metric("يوم", d)
 
-        st.markdown('<hr>', unsafe_allow_html=True)
         c4, c5, c6 = st.columns(3)
         c4.metric("الأيام", f"{total_days:,}")
         c5.metric("الأسابيع", f"{total_weeks:,}")
@@ -1012,14 +1238,12 @@ elif tool_choice == "📉 نقطة التعادل":
     price = st.number_input(f"سعر البيع ({currency})", min_value=0.0, value=100.0, step=5.0)
 
     st.markdown('<hr>', unsafe_allow_html=True)
-
     if price <= var:
         st.error("⚠️ السعر يجب أن يزيد عن التكلفة.")
     else:
         cm = price - var
         be_units = fixed / cm
         be_rev = be_units * price
-
         c1, c2, c3 = st.columns(3)
         c1.metric("القطع للتعادل", f"{be_units:,.0f}")
         c2.metric("إيراد التعادل", money(be_rev, currency))
@@ -1030,7 +1254,7 @@ elif tool_choice == "📉 نقطة التعادل":
 # 🧾 ضريبة VAT
 # ============================================================
 elif tool_choice == "🧾 ضريبة VAT":
-    page_header("🧾", "حاسبة ضريبة القيمة المضافة", "أضف أو استخرج الضريبة")
+    page_header("🧾", "ضريبة القيمة المضافة", "أضف أو استخرج الضريبة")
 
     currency = st.selectbox("العملة", CURRENCIES, index=0)
     mode = st.radio("الطريقة:", ["إضافة", "استخراج"], horizontal=True)
@@ -1038,7 +1262,6 @@ elif tool_choice == "🧾 ضريبة VAT":
     rate = st.number_input("النسبة (%)", min_value=0.0, value=15.0, step=1.0)
 
     st.markdown('<hr>', unsafe_allow_html=True)
-
     if mode == "إضافة":
         vat = price * (rate / 100)
         total = price + vat
@@ -1057,7 +1280,7 @@ elif tool_choice == "🧾 ضريبة VAT":
 # 📈 أرباح الكريبتو
 # ============================================================
 elif tool_choice == "📈 أرباح الكريبتو":
-    page_header("📈", "حاسبة أرباح الكريبتو", "صافي الربح بعد الرسوم")
+    page_header("📈", "أرباح الكريبتو", "صافي الربح بعد الرسوم")
 
     entry = st.number_input("سعر الدخول ($)", min_value=0.0, value=60000.0, step=100.0)
     amt = st.number_input("الكمية", min_value=0.0, value=0.1, step=0.01, format="%.4f")
@@ -1094,7 +1317,6 @@ elif tool_choice == "🛡️ إدارة المخاطر":
         stop = st.number_input("وقف الخسارة", min_value=0.0, value=48000.0, step=100.0)
 
     risk_amt = capital * (risk / 100)
-
     st.markdown('<hr>', unsafe_allow_html=True)
 
     if entry_p <= 0 or stop <= 0:
@@ -1104,7 +1326,6 @@ elif tool_choice == "🛡️ إدارة المخاطر":
     else:
         size = risk_amt / abs(entry_p - stop)
         value = size * entry_p
-
         c1, c2, c3 = st.columns(3)
         c1.metric("المخاطرة", f"{money(risk_amt)} USDT")
         c2.metric("الكمية", f"{size:.6f}")
@@ -1124,24 +1345,17 @@ elif tool_choice == "💱 محول العملات":
         st.error("⚠️ تعذر جلب الأسعار.")
     else:
         codes = sorted(rates.keys())
-        common = [
-            "USD", "SAR", "AED", "KWD", "OMR", "QAR", "BHD", "EGP",
-            "JOD", "EUR", "GBP", "TRY", "INR", "PKR", "CNY", "JPY",
-        ]
+        common = ["USD", "SAR", "AED", "KWD", "OMR", "QAR", "BHD", "EGP",
+                  "JOD", "EUR", "GBP", "TRY", "INR", "PKR", "CNY", "JPY"]
         ordered = [c for c in common if c in codes] + [c for c in codes if c not in common]
 
         col1, col2 = st.columns(2)
         with col1:
-            fr = st.selectbox(
-                "من", ordered,
-                index=1 if "SAR" in ordered else 0,
-                format_func=currency_label,
-            )
+            fr = st.selectbox("من", ordered, index=1 if "SAR" in ordered else 0, format_func=currency_label)
         with col2:
             to = st.selectbox("إلى", ordered, index=0, format_func=currency_label)
 
         amt = st.number_input("المبلغ", min_value=0.0, value=100.0, step=10.0)
-
         usd = amt / rates[fr]
         result = usd * rates[to]
 
@@ -1150,16 +1364,9 @@ elif tool_choice == "💱 محول العملات":
         c1.metric("النتيجة", f"{money(result, '', 4)} {to}")
         c2.metric("المبلغ الأصلي", f"{money(amt)} {fr}")
 
-        st.markdown('<hr>', unsafe_allow_html=True)
         st.info(f"💱 1 {fr} = {money(rates[to] / rates[fr], '', 4)} {to}")
         st.info(f"💱 1 {to} = {money(rates[fr] / rates[to], '', 4)} {fr}")
-
         st.caption(f"✅ {len(rates)} عملة مدعومة · تُحدّث كل ساعة")
-
-        share_buttons(
-            f"💱 {money(amt)} {fr} = {money(result, '', 4)} {to}\n"
-            f"من تطبيق أدوات التاجر الذكي"
-        )
 
 
 # ============================================================
@@ -1189,7 +1396,6 @@ elif tool_choice == "🗓️ أيام العمل":
                 pass
 
     st.markdown('<hr>', unsafe_allow_html=True)
-
     if start <= end:
         total = (end - start).days + 1
         work = 0
@@ -1229,12 +1435,8 @@ elif tool_choice == "📅 أرقام الفواتير":
         nums = [f"{prefix}{sep}{year}{sep}{start_num + i:0{padding}d}" for i in range(count)]
         df = pd.DataFrame({"رقم الفاتورة": nums})
         st.dataframe(df, use_container_width=True, hide_index=True)
-        st.download_button(
-            "📥 تحميل CSV",
-            data=df.to_csv(index=False).encode("utf-8-sig"),
-            file_name="invoice_numbers.csv",
-            mime="text/csv",
-        )
+        st.download_button("📥 تحميل CSV", data=df.to_csv(index=False).encode("utf-8-sig"),
+                          file_name="invoice_numbers.csv", mime="text/csv")
 
 
 # ============================================================
@@ -1257,12 +1459,8 @@ elif tool_choice == "🔲 مولد QR":
         elif not HAS_QR:
             st.error("مكتبة qrcode غير مثبتة.")
         else:
-            qr = qrcode.QRCode(
-                version=1,
-                error_correction=qrcode.constants.ERROR_CORRECT_H,
-                box_size=10,
-                border=2,
-            )
+            qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_H,
+                               box_size=10, border=2)
             qr.add_data(content.strip())
             qr.make(fit=True)
             img = qr.make_image(fill_color=color, back_color="white")
@@ -1270,12 +1468,8 @@ elif tool_choice == "🔲 مولد QR":
             img.save(buf, format="PNG")
             buf.seek(0)
             st.image(buf, width=size)
-            st.download_button(
-                "📥 تحميل PNG",
-                data=buf.getvalue(),
-                file_name="qrcode.png",
-                mime="image/png",
-            )
+            st.download_button("📥 تحميل PNG", data=buf.getvalue(),
+                              file_name="qrcode.png", mime="image/png")
 
 
 # ============================================================
