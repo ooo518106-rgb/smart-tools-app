@@ -11,6 +11,7 @@ from helpers import (
     check_pin, render_reminders,
     get_hijri_date, print_button,
     pdf_download_button, quick_print,
+    backup_restore_ui,
 )
 
 try:
@@ -38,6 +39,7 @@ defaults = {
     "theme": "تلقائي",
     "search_query": "",
     "reminders": [],
+    "customers": [],
     "pin_ok": False,
 }
 for k, v in defaults.items():
@@ -396,6 +398,8 @@ ALL_TOOLS = [
     "📧 مولّد البريد الاحترافي",
     "🎨 مولّد الشعار",
     "📞 حاسبة الاتصال الدولي",
+    "👥 إدارة العملاء",
+    "💾 النسخ الاحتياطي",
     "📄 القوالب الجاهزة",
     "📜 سياسة الخصوصية",
 ]
@@ -442,12 +446,13 @@ if tool_choice == "🏠 الرئيسية":
         )
 
     total_ops = len(st.session_state.all_results)
+    total_customers = len(st.session_state.get("customers", []))
 
     st.markdown(
         '<div class="stat-grid">'
         '<div class="stat-card">'
         '<div class="stat-icon">🛠️</div>'
-        '<div class="stat-value">36</div>'
+        '<div class="stat-value">38</div>'
         '<div class="stat-label">أداة متاحة</div>'
         '</div>'
         '<div class="stat-card">'
@@ -456,9 +461,9 @@ if tool_choice == "🏠 الرئيسية":
         '<div class="stat-label">عملية محفوظة</div>'
         '</div>'
         '<div class="stat-card">'
-        '<div class="stat-icon">🌍</div>'
-        '<div class="stat-value">+160</div>'
-        '<div class="stat-label">عملة مدعومة</div>'
+        '<div class="stat-icon">👥</div>'
+        '<div class="stat-value">' + str(total_customers) + '</div>'
+        '<div class="stat-label">عميل مسجّل</div>'
         '</div>'
         '</div>',
         unsafe_allow_html=True,
@@ -500,6 +505,10 @@ if tool_choice == "🏠 الرئيسية":
             "📈 أرباح الكريبتو",
             "🛡️ إدارة المخاطر",
             "📞 حاسبة الاتصال الدولي",
+        ],
+        "👥 العملاء والبيانات": [
+            "👥 إدارة العملاء",
+            "💾 النسخ الاحتياطي",
         ],
         "🛠️ أدوات مساعدة": [
             "💬 روابط واتساب",
@@ -558,16 +567,73 @@ elif tool_choice == "📊 لوحة التقارير":
         st.dataframe(df_all, use_container_width=True, hide_index=True)
 
         st.markdown('<h2 class="section-title">📊 إحصائيات</h2>', unsafe_allow_html=True)
+
+        try:
+            import plotly.express as px
+            HAS_PLOTLY = True
+        except ImportError:
+            HAS_PLOTLY = False
+
         tool_counts = df_all["الأداة"].value_counts()
-        st.bar_chart(tool_counts)
+
+        if HAS_PLOTLY:
+            fig = px.bar(
+                x=tool_counts.values,
+                y=tool_counts.index,
+                orientation="h",
+                labels={"x": "عدد المرات", "y": "الأداة"},
+                color=tool_counts.values,
+                color_continuous_scale="Purples",
+            )
+            fig.update_layout(
+                height=400,
+                showlegend=False,
+                font=dict(family="Cairo"),
+                margin=dict(l=10, r=10, t=30, b=10),
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.bar_chart(tool_counts)
 
         df_all["اليوم"] = df_all["التاريخ"].str.split(" ").str[0]
         daily = df_all.groupby("اليوم").size()
-        st.line_chart(daily)
+
+        if HAS_PLOTLY:
+            fig2 = px.area(
+                x=daily.index,
+                y=daily.values,
+                labels={"x": "اليوم", "y": "عدد العمليات"},
+            )
+            fig2.update_traces(line_color="#ec4899", fillcolor="rgba(236,72,153,0.2)")
+            fig2.update_layout(
+                height=300,
+                font=dict(family="Cairo"),
+                margin=dict(l=10, r=10, t=30, b=10),
+            )
+            st.plotly_chart(fig2, use_container_width=True)
+        else:
+            st.line_chart(daily)
 
         df_all["الشهر"] = df_all["التاريخ"].str.slice(0, 7)
         monthly = df_all.groupby("الشهر").size()
-        st.bar_chart(monthly)
+
+        if HAS_PLOTLY:
+            fig3 = px.bar(
+                x=monthly.index,
+                y=monthly.values,
+                labels={"x": "الشهر", "y": "عدد العمليات"},
+                color=monthly.values,
+                color_continuous_scale="Blues",
+            )
+            fig3.update_layout(
+                height=300,
+                showlegend=False,
+                font=dict(family="Cairo"),
+                margin=dict(l=10, r=10, t=30, b=10),
+            )
+            st.plotly_chart(fig3, use_container_width=True)
+        else:
+            st.bar_chart(monthly)
 
         if len(monthly) >= 2:
             current_m = monthly.iloc[-1]
@@ -611,7 +677,7 @@ elif tool_choice == "📊 لوحة التقارير":
                 st.session_state.ecommerce_history = []
                 st.toast("تم المسح", icon="🗑️")
                 st.rerun()
-
+                
 
 # ============================================================
 # 📦 التجارة الإلكترونية
@@ -655,13 +721,13 @@ elif tool_choice == "📦 التجارة الإلكترونية":
     exp_c1, exp_c2 = st.columns(2)
     with exp_c1:
         pdf_download_button(
-            "E-commerce Calculator",
+            "حاسبة التجارة الإلكترونية",
             [
-                ("Total Cost", money(total_cost, currency)),
-                ("Payment Fees", money(gateway_fees, currency)),
-                ("Selling Price", money(selling_price, currency)),
-                ("Net Profit", money(net_profit, currency)),
-                ("Margin", f"{margin:.1f}%"),
+                ("التكلفة الإجمالية", money(total_cost, currency)),
+                ("رسوم الدفع", money(gateway_fees, currency)),
+                ("سعر البيع", money(selling_price, currency)),
+                ("الربح الصافي", money(net_profit, currency)),
+                ("هامش الربح", f"{margin:.1f}%"),
             ],
             filename="ecommerce_report.pdf",
             key_suffix="ecom",
@@ -737,12 +803,12 @@ elif tool_choice == "💳 تابي وتمارا":
     exp_c1, exp_c2 = st.columns(2)
     with exp_c1:
         pdf_download_button(
-            "Tabby & Tamara Fees",
+            "رسوم تابي وتمارا",
             [
-                ("Price", money(price, currency)),
-                ("Commission", money(fee_amount, currency)),
-                ("VAT", money(vat_amount, currency)),
-                ("Net to Merchant", money(net, currency)),
+                ("السعر", money(price, currency)),
+                ("العمولة", money(fee_amount, currency)),
+                ("الضريبة", money(vat_amount, currency)),
+                ("الصافي للتاجر", money(net, currency)),
             ],
             filename="tabby_tamara.pdf",
             key_suffix="tamara",
@@ -967,10 +1033,10 @@ elif tool_choice == "🕋 زكاة المال":
         exp_c1, exp_c2 = st.columns(2)
         with exp_c1:
             pdf_download_button(
-                "Zakat Calculator",
+                "حاسبة الزكاة",
                 [
-                    ("Total Wealth", money(wealth)),
-                    ("Zakat (2.5%)", money(zakat)),
+                    ("إجمالي المال", money(wealth)),
+                    ("مقدار الزكاة", money(zakat)),
                 ],
                 filename="zakat.pdf",
                 key_suffix="zakat",
@@ -1549,7 +1615,7 @@ elif tool_choice == "🗓️ أيام العمل":
         c1.metric("إجمالي", total)
         c2.metric("أيام العمل", work)
         c3.metric("راحة", total - work)
-
+        
 
 # ============================================================
 # 📅 أرقام الفواتير
@@ -1836,6 +1902,109 @@ elif tool_choice == "📞 حاسبة الاتصال الدولي":
 
 
 # ============================================================
+# 👥 إدارة العملاء
+# ============================================================
+elif tool_choice == "👥 إدارة العملاء":
+    page_header("👥", "إدارة العملاء", "سجل عملائك وفواتيرهم")
+
+    customers = st.session_state.get("customers", [])
+
+    tab1, tab2, tab3 = st.tabs(["➕ إضافة عميل", "📋 قائمة العملاء", "📊 إحصائيات"])
+
+    with tab1:
+        st.markdown("### إضافة عميل جديد")
+        c_name = st.text_input("اسم العميل:", key="cust_name")
+        c_phone = st.text_input("رقم الجوال:", key="cust_phone", placeholder="966500000000")
+        c_email = st.text_input("البريد (اختياري):", key="cust_email")
+        c_city = st.text_input("المدينة (اختياري):", key="cust_city")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            c_total = st.number_input("إجمالي المشتريات:", min_value=0.0, value=0.0, step=100.0, key="cust_total")
+        with col2:
+            c_orders = st.number_input("عدد الطلبات:", min_value=0, value=0, step=1, key="cust_orders")
+
+        c_notes = st.text_area("ملاحظات:", key="cust_notes", height=80)
+
+        if st.button("➕ إضافة العميل", use_container_width=True):
+            if not c_name.strip():
+                st.warning("أدخل اسم العميل")
+            else:
+                record = {
+                    "الاسم": c_name.strip(),
+                    "الجوال": c_phone.strip(),
+                    "البريد": c_email.strip(),
+                    "المدينة": c_city.strip(),
+                    "إجمالي المشتريات": round(c_total, 2),
+                    "عدد الطلبات": c_orders,
+                    "ملاحظات": c_notes.strip(),
+                    "تاريخ الإضافة": datetime.datetime.now().strftime("%Y-%m-%d"),
+                }
+                customers.append(record)
+                st.session_state.customers = customers
+                st.toast("✅ تمت الإضافة", icon="👥")
+                st.rerun()
+
+    with tab2:
+        if not customers:
+            st.info("📭 لا يوجد عملاء بعد")
+        else:
+            df_c = pd.DataFrame(customers)
+            st.dataframe(df_c, use_container_width=True, hide_index=True)
+
+            st.markdown("### 🗑️ حذف عميل")
+            names = [c["الاسم"] for c in customers]
+            del_name = st.selectbox("اختر العميل", names, key="del_cust")
+            if st.button("🗑️ حذف", use_container_width=True):
+                st.session_state.customers = [c for c in customers if c["الاسم"] != del_name]
+                st.toast("تم الحذف", icon="🗑️")
+                st.rerun()
+
+            st.markdown("### 📥 تصدير")
+            csv = df_c.to_csv(index=False).encode("utf-8-sig")
+            st.download_button(
+                "📥 تحميل CSV",
+                data=csv,
+                file_name="customers.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+
+    with tab3:
+        if customers:
+            total_revenue = sum(c.get("إجمالي المشتريات", 0) for c in customers)
+            total_orders = sum(c.get("عدد الطلبات", 0) for c in customers)
+
+            c1, c2, c3 = st.columns(3)
+            c1.metric("👥 عدد العملاء", len(customers))
+            c2.metric("💰 إجمالي المشتريات", money(total_revenue))
+            c3.metric("📦 إجمالي الطلبات", total_orders)
+
+            if total_orders > 0:
+                avg_order = total_revenue / total_orders
+                st.metric("📊 متوسط قيمة الطلب", money(avg_order))
+
+            city_counts = {}
+            for c in customers:
+                city = c.get("المدينة", "").strip() or "غير محدد"
+                city_counts[city] = city_counts.get(city, 0) + 1
+            st.bar_chart(pd.Series(city_counts))
+        else:
+            st.info("📊 لا توجد إحصائيات بعد")
+
+
+# ============================================================
+# 💾 النسخ الاحتياطي
+# ============================================================
+elif tool_choice == "💾 النسخ الاحتياطي":
+    page_header("💾", "النسخ الاحتياطي", "احفظ بياناتك واستعدها في أي وقت")
+
+    st.info("💡 احفظ نسخة من بياناتك (العمليات، العملاء، التنبيهات) واستعدها لاحقاً.")
+
+    backup_restore_ui()
+
+
+# ============================================================
 # 📄 القوالب الجاهزة
 # ============================================================
 elif tool_choice == "📄 القوالب الجاهزة":
@@ -1864,7 +2033,7 @@ elif tool_choice == "📄 القوالب الجاهزة":
             "سماعة,50.00,15.00,4.30,40,140.00,70.70\n"
         ),
         "عرض سعر": (
-            "البند,الوصف,الكمية,السعر,الإجمالي\n"
+            "بند,الوصف,الكمية,السعر,الإجمالي\n"
             "1,منتج,5,100.00,500.00\n"
         ),
     }
