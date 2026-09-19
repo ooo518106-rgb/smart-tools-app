@@ -9,6 +9,7 @@ from helpers import (
     export_to_excel, page_header, share_buttons,
     fetch_currency_rates, currency_label,
     check_pin, render_reminders,
+    get_hijri_date, print_button,
 )
 
 try:
@@ -48,71 +49,51 @@ def apply_theme(theme_name):
         "فاتح": {
             "bg": "linear-gradient(135deg, #eef2ff 0%, #fce7f3 100%)",
             "card": "rgba(255, 255, 255, 0.85)",
-            "accent": "#6366f1",
-            "accent2": "#ec4899",
-            "text": "#1e293b",
-            "sub": "#64748b",
-            "sidebar1": "#4f46e5",
-            "sidebar2": "#7c3aed",
+            "accent": "#6366f1", "accent2": "#ec4899",
+            "text": "#1e293b", "sub": "#64748b",
+            "sidebar1": "#4f46e5", "sidebar2": "#7c3aed",
             "field_bg": "rgba(255, 255, 255, 0.95)",
-            "field_border": "#e2e8f0",
-            "field_text": "#1e293b",
+            "field_border": "#e2e8f0", "field_text": "#1e293b",
             "border": "rgba(99, 102, 241, 0.15)",
         },
         "داكن": {
             "bg": "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
             "card": "rgba(30, 41, 59, 0.85)",
-            "accent": "#818cf8",
-            "accent2": "#f472b6",
-            "text": "#e2e8f0",
-            "sub": "#94a3b8",
-            "sidebar1": "#1e1b4b",
-            "sidebar2": "#312e81",
+            "accent": "#818cf8", "accent2": "#f472b6",
+            "text": "#e2e8f0", "sub": "#94a3b8",
+            "sidebar1": "#1e1b4b", "sidebar2": "#312e81",
             "field_bg": "rgba(30, 41, 59, 0.9)",
-            "field_border": "#334155",
-            "field_text": "#e2e8f0",
+            "field_border": "#334155", "field_text": "#e2e8f0",
             "border": "rgba(129, 140, 248, 0.2)",
         },
         "غروب": {
             "bg": "linear-gradient(135deg, #fff7ed 0%, #fee2e2 100%)",
             "card": "rgba(255, 255, 255, 0.85)",
-            "accent": "#ea580c",
-            "accent2": "#dc2626",
-            "text": "#7c2d12",
-            "sub": "#9a3412",
-            "sidebar1": "#c2410c",
-            "sidebar2": "#ea580c",
+            "accent": "#ea580c", "accent2": "#dc2626",
+            "text": "#7c2d12", "sub": "#9a3412",
+            "sidebar1": "#c2410c", "sidebar2": "#ea580c",
             "field_bg": "rgba(255, 255, 255, 0.95)",
-            "field_border": "#fed7aa",
-            "field_text": "#7c2d12",
+            "field_border": "#fed7aa", "field_text": "#7c2d12",
             "border": "rgba(234, 88, 12, 0.15)",
         },
         "محيط": {
             "bg": "linear-gradient(135deg, #ecfeff 0%, #cffafe 100%)",
             "card": "rgba(255, 255, 255, 0.85)",
-            "accent": "#0891b2",
-            "accent2": "#06b6d4",
-            "text": "#164e63",
-            "sub": "#155e75",
-            "sidebar1": "#0e7490",
-            "sidebar2": "#0891b2",
+            "accent": "#0891b2", "accent2": "#06b6d4",
+            "text": "#164e63", "sub": "#155e75",
+            "sidebar1": "#0e7490", "sidebar2": "#0891b2",
             "field_bg": "rgba(255, 255, 255, 0.95)",
-            "field_border": "#a5f3fc",
-            "field_text": "#164e63",
+            "field_border": "#a5f3fc", "field_text": "#164e63",
             "border": "rgba(8, 145, 178, 0.15)",
         },
         "غابة": {
             "bg": "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)",
             "card": "rgba(255, 255, 255, 0.85)",
-            "accent": "#059669",
-            "accent2": "#10b981",
-            "text": "#064e3b",
-            "sub": "#065f46",
-            "sidebar1": "#047857",
-            "sidebar2": "#059669",
+            "accent": "#059669", "accent2": "#10b981",
+            "text": "#064e3b", "sub": "#065f46",
+            "sidebar1": "#047857", "sidebar2": "#059669",
             "field_bg": "rgba(255, 255, 255, 0.95)",
-            "field_border": "#a7f3d0",
-            "field_text": "#064e3b",
+            "field_border": "#a7f3d0", "field_text": "#064e3b",
             "border": "rgba(5, 150, 105, 0.15)",
         },
     }
@@ -350,6 +331,11 @@ ALL_TOOLS = [
     "🗓️ أيام العمل",
     "📅 أرقام الفواتير",
     "🔲 مولد QR",
+    "🔐 مولد كلمات السر",
+    "🎯 أهداف المبيعات",
+    "📧 مولّد البريد الاحترافي",
+    "🎨 مولّد الشعار",
+    "📞 حاسبة الاتصال الدولي",
     "📄 القوالب الجاهزة",
     "📜 سياسة الخصوصية",
 ]
@@ -371,11 +357,29 @@ if st.session_state.all_results:
 
 CURRENCIES = ["ر.س", "د.إ", "د.ك", "ر.ع", "ج.م", "$", "€", "£"]
 
+
 # ============================================================
 # 🏠 الرئيسية
 # ============================================================
 if tool_choice == "🏠 الرئيسية":
     page_header("💼", "أدوات التاجر الذكي", "مجموعتك المتكاملة للحسابات التجارية والمالية")
+
+    hijri = get_hijri_date()
+    today_g = datetime.date.today().strftime("%Y-%m-%d")
+    if hijri:
+        st.markdown(
+            '<div style="text-align:center; padding:8px; color:#64748b; font-size:0.85rem;">'
+            '🌙 ' + hijri + ' &nbsp;·&nbsp; 📅 ' + today_g + ' م'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            '<div style="text-align:center; padding:8px; color:#64748b; font-size:0.85rem;">'
+            '📅 ' + today_g +
+            '</div>',
+            unsafe_allow_html=True,
+        )
 
     total_ops = len(st.session_state.all_results)
 
@@ -383,7 +387,7 @@ if tool_choice == "🏠 الرئيسية":
         '<div class="stat-grid">'
         '<div class="stat-card">'
         '<div class="stat-icon">🛠️</div>'
-        '<div class="stat-value">31</div>'
+        '<div class="stat-value">36</div>'
         '<div class="stat-label">أداة متاحة</div>'
         '</div>'
         '<div class="stat-card">'
@@ -425,6 +429,7 @@ if tool_choice == "🏠 الرئيسية":
             "📊 LTV / CAC",
             "📉 نقطة التعادل",
             "📦 نقطة إعادة الطلب",
+            "🎯 أهداف المبيعات",
         ],
         "🧾 الضرائب والزكاة": [
             "🕋 زكاة المال",
@@ -434,6 +439,7 @@ if tool_choice == "🏠 الرئيسية":
             "💱 محول العملات",
             "📈 أرباح الكريبتو",
             "🛡️ إدارة المخاطر",
+            "📞 حاسبة الاتصال الدولي",
         ],
         "🛠️ أدوات مساعدة": [
             "💬 روابط واتساب",
@@ -442,18 +448,23 @@ if tool_choice == "🏠 الرئيسية":
             "⏳ حاسبة العمر",
             "📅 أرقام الفواتير",
             "🔲 مولد QR",
+            "🔐 مولد كلمات السر",
+            "📧 مولّد البريد الاحترافي",
+            "🎨 مولّد الشعار",
             "📄 القوالب الجاهزة",
         ],
     }
 
     for cat_name, tools in categories.items():
-        st.markdown(f'<h3 style="margin-top:20px; color:#6366f1;">{cat_name}</h3>', unsafe_allow_html=True)
+        st.markdown(
+            '<h3 style="margin-top:20px; color:#6366f1;">' + cat_name + '</h3>',
+            unsafe_allow_html=True,
+        )
         cols = st.columns(2)
         for i, t in enumerate(tools):
             with cols[i % 2]:
                 if st.button(t, key=f"home_{cat_name}_{t}", use_container_width=True):
                     st.session_state.search_query = ""
-                    st.session_state.force_tool = t
                     st.rerun()
 
     if total_ops > 0:
@@ -474,7 +485,7 @@ elif tool_choice == "📊 لوحة التقارير":
     page_header("📊", "لوحة التقارير", "جميع نتائجك المحفوظة في مكان واحد")
 
     if not st.session_state.all_results:
-        st.info("📭 لا توجد نتائج محفوظة بعد. ابدأ باستخدام الحاسبات واحفظ النتائج.")
+        st.info("📭 لا توجد نتائج محفوظة بعد.")
     else:
         df_all = pd.DataFrame(st.session_state.all_results)
 
@@ -514,7 +525,13 @@ elif tool_choice == "📊 لوحة التقارير":
         col1, col2, col3 = st.columns(3)
         with col1:
             csv_all = df_all.to_csv(index=False).encode("utf-8-sig")
-            st.download_button("📥 CSV", data=csv_all, file_name="Report.csv", mime="text/csv", use_container_width=True)
+            st.download_button(
+                "📥 CSV",
+                data=csv_all,
+                file_name="Report.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
         with col2:
             sheets = {"الكل": df_all}
             for tool in df_all["الأداة"].unique():
@@ -522,7 +539,9 @@ elif tool_choice == "📊 لوحة التقارير":
             excel_bytes = export_to_excel(sheets, "Merchant_Report.xlsx")
             if excel_bytes:
                 st.download_button(
-                    "📥 Excel", data=excel_bytes, file_name="Merchant_Report.xlsx",
+                    "📥 Excel",
+                    data=excel_bytes,
+                    file_name="Merchant_Report.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True,
                 )
@@ -532,7 +551,7 @@ elif tool_choice == "📊 لوحة التقارير":
                 st.session_state.ecommerce_history = []
                 st.toast("تم المسح", icon="🗑️")
                 st.rerun()
-
+        
 
 # ============================================================
 # 📦 التجارة الإلكترونية
@@ -541,7 +560,6 @@ elif tool_choice == "📦 التجارة الإلكترونية":
     page_header("📦", "حاسبة التجارة الإلكترونية", "احسب هوامش الربح الصافية")
 
     currency = st.selectbox("العملة", CURRENCIES, index=0)
-
     col1, col2 = st.columns(2)
     with col1:
         cost_price = st.number_input(f"تكلفة المنتج ({currency})", min_value=0.0, value=50.0, step=1.0)
@@ -551,7 +569,6 @@ elif tool_choice == "📦 التجارة الإلكترونية":
         gateway_fee_percent = st.number_input("رسوم بوابة الدفع (%)", min_value=0.0, value=2.2, step=0.1)
 
     fixed_fee = st.number_input(f"الرسوم الثابتة ({currency})", min_value=0.0, value=1.0, step=0.5)
-
     total_cost = cost_price + shipping_cost
     gateway_fees = (selling_price * (gateway_fee_percent / 100)) + fixed_fee
     net_profit = selling_price - total_cost - gateway_fees
@@ -573,7 +590,6 @@ elif tool_choice == "📦 التجارة الإلكترونية":
         f"الربح: {money(net_profit, currency)}\n"
         f"الهامش: {margin:.1f}%"
     )
-
     share_buttons(
         f"📦 نتيجة حاسبة التجارة:\n"
         f"الربح الصافي: {money(net_profit, currency)}\n"
@@ -634,7 +650,6 @@ elif tool_choice == "💳 تابي وتمارا":
     c3.metric("الصافي", money(net, currency))
 
     share_buttons(f"💳 الصافي بعد تابي/تمارا: {money(net, currency)}\nمن تطبيق أدوات التاجر الذكي")
-
     quick_save_button("tamara", "تابي/تمارا", {
         "السعر": price, "العمولة": round(fee_amount, 2),
         "الضريبة": round(vat_amount, 2), "الصافي": round(net, 2), "العملة": currency,
@@ -702,7 +717,6 @@ elif tool_choice == "📢 الإعلانات ROAS":
         aov = st.number_input(f"متوسط قيمة الطلب ({currency})", min_value=0.0, value=150.0, step=10.0)
 
     margin_percent = st.number_input("هامش الربح (%)", min_value=0.0, value=40.0, step=1.0)
-
     revenue = orders * aov
     roas = (revenue / ad_spend) if ad_spend > 0 else 0
     cpa = (ad_spend / orders) if orders > 0 else 0
@@ -902,7 +916,6 @@ elif tool_choice == "🛡️ نهاية الخدمة":
             gratuity *= 2 / 3
 
     st.markdown('<hr>', unsafe_allow_html=True)
-
     if nationality == "سعودي":
         emp = salary * 0.0975
         er = salary * 0.1175
@@ -1470,6 +1483,231 @@ elif tool_choice == "🔲 مولد QR":
             st.image(buf, width=size)
             st.download_button("📥 تحميل PNG", data=buf.getvalue(),
                               file_name="qrcode.png", mime="image/png")
+
+
+# ============================================================
+# 🔐 مولّد كلمات السر
+# ============================================================
+elif tool_choice == "🔐 مولد كلمات السر":
+    import secrets
+    import string
+
+    page_header("🔐", "مولّد كلمات السر", "كلمات سر قوية ومأمونة")
+
+    length = st.slider("طول كلمة السر", min_value=8, max_value=64, value=16)
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        use_upper = st.checkbox("أحرف كبيرة A-Z", value=True)
+    with col2:
+        use_lower = st.checkbox("أحرف صغيرة a-z", value=True)
+    with col3:
+        use_digits = st.checkbox("أرقام 0-9", value=True)
+
+    use_symbols = st.checkbox("رموز !@#$%", value=True)
+    count = st.number_input("عدد كلمات السر", min_value=1, max_value=20, value=5, step=1)
+
+    if st.button("🎲 توليد كلمات السر"):
+        chars = ""
+        if use_upper:
+            chars += string.ascii_uppercase
+        if use_lower:
+            chars += string.ascii_lowercase
+        if use_digits:
+            chars += string.digits
+        if use_symbols:
+            chars += "!@#$%^&*()_+-=[]{}|;:,.<>?"
+
+        if not chars:
+            st.error("⚠️ اختر نوعاً واحداً على الأقل")
+        else:
+            passwords = []
+            for _ in range(int(count)):
+                pw = "".join(secrets.choice(chars) for _ in range(length))
+                passwords.append(pw)
+
+            for i, pw in enumerate(passwords, 1):
+                st.code(pw, language="")
+
+            st.download_button(
+                "📥 تحميل كـ TXT",
+                data="\n".join(passwords).encode("utf-8"),
+                file_name="passwords.txt",
+                mime="text/plain",
+                use_container_width=True,
+            )
+
+
+# ============================================================
+# 🎯 أهداف المبيعات
+# ============================================================
+elif tool_choice == "🎯 أهداف المبيعات":
+    page_header("🎯", "حاسبة أهداف المبيعات", "خطط لتحقيق هدفك الشهري")
+
+    currency = st.selectbox("العملة", CURRENCIES, index=0)
+
+    target = st.number_input(f"الهدف الشهري ({currency})", min_value=0.0, value=50000.0, step=1000.0)
+    avg_sale = st.number_input(f"متوسط قيمة الطلب ({currency})", min_value=1.0, value=200.0, step=10.0)
+    work_days = st.number_input("أيام العمل شهرياً", min_value=1, max_value=31, value=26, step=1)
+    current = st.number_input(f"المبيعات الحالية ({currency})", min_value=0.0, value=0.0, step=500.0)
+
+    remaining = max(target - current, 0)
+    if avg_sale > 0:
+        orders_needed = remaining / avg_sale
+        orders_per_day = orders_needed / work_days
+    else:
+        orders_needed = 0
+        orders_per_day = 0
+
+    progress = (current / target * 100) if target > 0 else 0
+
+    st.markdown('<hr>', unsafe_allow_html=True)
+    st.metric("📊 التقدم الحالي", f"{progress:.1f}%")
+    st.progress(min(progress / 100, 1.0))
+
+    st.markdown('<hr>', unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+    c1.metric("المتبقي", money(remaining, currency))
+    c2.metric("طلبات مطلوبة", f"{orders_needed:.0f}")
+    c3.metric("طلبات يومياً", f"{orders_per_day:.1f}")
+
+    if progress >= 100:
+        st.success("🎉 تحقق الهدف! مبروك!")
+    elif progress >= 75:
+        st.info("💪 قريب جداً! واصل!")
+    elif progress >= 50:
+        st.warning("⚡ نصف الطريق!")
+    else:
+        st.error("🚀 تحتاج جهداً أكبر!")
+
+
+# ============================================================
+# 📧 مولّد البريد الاحترافي
+# ============================================================
+elif tool_choice == "📧 مولّد البريد الاحترافي":
+    page_header("📧", "مولّد البريد الاحترافي", "أنشئ توقيع بريد رسمي")
+
+    sender_name = st.text_input("اسمك:")
+    sender_title = st.text_input("منصبك:", placeholder="مدير المبيعات")
+    company = st.text_input("الشركة:", placeholder="شركة XYZ")
+    phone = st.text_input("رقم الجوال:", placeholder="+966 5X XXX XXXX")
+    email = st.text_input("البريد الإلكتروني:", placeholder="name@company.com")
+    website = st.text_input("الموقع الإلكتروني (اختياري):", placeholder="www.company.com")
+    color = st.color_picker("اللون المميز:", "#6366f1")
+
+    if st.button("📧 توليد التوقيع"):
+        if not sender_name.strip():
+            st.warning("أدخل اسمك على الأقل")
+        else:
+            signature = (
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"👤 {sender_name}\n"
+                f"💼 {sender_title}\n"
+                f"🏢 {company}\n"
+                "━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"📱 {phone}\n"
+                f"📧 {email}\n"
+            )
+            if website.strip():
+                signature += f"🌐 {website}\n"
+            signature += "━━━━━━━━━━━━━━━━━━━━━━"
+
+            st.code(signature, language="")
+            st.success("✅ تم التوليد! انسخه والصقه في بريدك")
+
+            html_sig = (
+                '<div style="font-family:Cairo,Arial; padding:16px; '
+                'border-right:4px solid ' + color + '; background:#f8fafc; '
+                'border-radius:8px; direction:rtl;">'
+                '<div style="font-size:1.1rem; font-weight:800; color:' + color + ';">'
+                + sender_name +
+                '</div>'
+                '<div style="color:#64748b; font-size:0.85rem;">' + sender_title + ' · ' + company + '</div>'
+                '<div style="margin-top:10px; font-size:0.85rem; color:#1e293b;">'
+                '📱 ' + phone + '<br>📧 ' + email
+            )
+            if website.strip():
+                html_sig += '<br>🌐 ' + website
+            html_sig += '</div></div>'
+
+            st.markdown("### 👁️ معاينة:")
+            st.markdown(html_sig, unsafe_allow_html=True)
+
+
+# ============================================================
+# 🎨 مولّد الشعار
+# ============================================================
+elif tool_choice == "🎨 مولّد الشعار":
+    page_header("🎨", "مولّد الشعار", "أنشئ شعاراً بسيطاً لمشروعك")
+
+    brand_name = st.text_input("اسم البراند:", placeholder="متجر XYZ")
+    tagline = st.text_input("الشعار الفرعي (اختياري):", placeholder="جودة تستحق الثقة")
+    icon = st.text_input("الأيقونة (إيموجي):", value="🛍️", max_chars=3)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        bg_color = st.color_picker("لون الخلفية:", "#6366f1")
+    with col2:
+        text_color = st.color_picker("لون النص:", "#ffffff")
+
+    if st.button("🎨 توليد الشعار"):
+        if not brand_name.strip():
+            st.warning("أدخل اسم البراند")
+        else:
+            html_logo = (
+                '<div style="text-align:center; padding:40px 20px; '
+                'background:' + bg_color + '; border-radius:20px; '
+                'box-shadow:0 10px 30px rgba(0,0,0,0.15);">'
+                '<div style="font-size:4rem; margin-bottom:10px;">' + icon + '</div>'
+                '<div style="color:' + text_color + '; font-size:2rem; '
+                'font-weight:900; font-family:Cairo, Arial;">' + brand_name + '</div>'
+            )
+            if tagline.strip():
+                html_logo += (
+                    '<div style="color:' + text_color + '; opacity:0.85; '
+                    'font-size:1rem; margin-top:8px; font-family:Cairo, Arial;">'
+                    + tagline + '</div>'
+                )
+            html_logo += '</div>'
+
+            st.markdown("### 👁️ معاينة الشعار:")
+            st.markdown(html_logo, unsafe_allow_html=True)
+            st.info("💡 التقط صورة للشاشة لحفظ الشعار.")
+
+
+# ============================================================
+# 📞 حاسبة الاتصال الدولي
+# ============================================================
+elif tool_choice == "📞 حاسبة الاتصال الدولي":
+    page_header("📞", "حاسبة الاتصال الدولي", "احسب تكلفة مكالماتك الدولية")
+
+    minutes = st.number_input("عدد الدقائق", min_value=1, value=10, step=1)
+
+    countries = {
+        "مصر": 0.30, "السعودية": 0.15, "الإمارات": 0.18,
+        "الكويت": 0.20, "قطر": 0.22, "البحرين": 0.20,
+        "عمان": 0.20, "الأردن": 0.25, "لبنان": 0.28,
+        "سوريا": 0.35, "العراق": 0.32, "اليمن": 0.30,
+        "المغرب": 0.28, "تونس": 0.30, "الجزائر": 0.30,
+        "ليبيا": 0.30, "السودان": 0.35, "تركيا": 0.20,
+        "أمريكا": 0.10, "بريطانيا": 0.12, "فرنسا": 0.12,
+        "ألمانيا": 0.12,
+    }
+
+    country = st.selectbox("الدولة", list(countries.keys()))
+    rate = countries[country]
+
+    custom_rate = st.number_input("أو أدخل سعر الدقيقة يدوياً ($)", min_value=0.0, value=rate, step=0.01)
+
+    total = minutes * custom_rate
+
+    st.markdown('<hr>', unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+    c1.metric("الدقائق", minutes)
+    c2.metric("سعر الدقيقة", f"${custom_rate:.2f}")
+    c3.metric("التكلفة", f"${total:.2f}")
+
+    if minutes >= 30:
+        st.info("💡 **نصيحة:** للمكالمات الطويلة، جرّب باقات الاتصال الشهرية — غالباً أوفر.")
 
 
 # ============================================================
