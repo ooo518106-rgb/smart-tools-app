@@ -187,3 +187,115 @@ def page_header(icon, title, subtitle=""):
             '<div class="sub-title">' + subtitle + '</div>',
             unsafe_allow_html=True,
         )
+
+
+LANG = {
+    "ar": {
+        "search": "🔍 ابحث عن أداة",
+        "theme": "🎨 الثيم",
+        "lang": "🌐 اللغة",
+        "reminders": "🔔 التنبيهات",
+        "add_reminder": "➕ إضافة تنبيه",
+        "reminder_text": "نص التنبيه:",
+        "reminder_date": "التاريخ:",
+        "no_reminders": "لا توجد تنبيهات",
+        "overdue": "⚠️ متأخر!",
+        "today": "⏰ اليوم!",
+        "upcoming": "📅 قادم",
+        "monthly": "📆 المقارنة الشهرية",
+        "save": "💾 حفظ",
+        "delete": "🗑️ حذف",
+        "current_month": "الشهر الحالي",
+        "prev_month": "الشهر الماضي",
+        "change": "التغيير",
+    },
+    "en": {
+        "search": "🔍 Search tool",
+        "theme": "🎨 Theme",
+        "lang": "🌐 Language",
+        "reminders": "🔔 Reminders",
+        "add_reminder": "➕ Add Reminder",
+        "reminder_text": "Reminder text:",
+        "reminder_date": "Date:",
+        "no_reminders": "No reminders",
+        "overdue": "⚠️ Overdue!",
+        "today": "⏰ Today!",
+        "upcoming": "📅 Upcoming",
+        "monthly": "📆 Monthly Comparison",
+        "save": "💾 Save",
+        "delete": "🗑️ Delete",
+        "current_month": "Current Month",
+        "prev_month": "Previous Month",
+        "change": "Change",
+    },
+}
+
+
+def t(key, lang="ar"):
+    return LANG.get(lang, LANG["ar"]).get(key, key)
+
+
+def check_pin():
+    correct = ""
+    try:
+        correct = st.secrets.get("APP_PIN", "")
+    except Exception:
+        correct = ""
+
+    if not correct:
+        return True
+
+    if st.session_state.get("pin_ok"):
+        return True
+
+    st.markdown("### 🔐 أدخل رمز الدخول")
+    pin = st.text_input("الرمز:", type="password", key="pin_input")
+    if st.button("دخول"):
+        if pin == correct:
+            st.session_state.pin_ok = True
+            st.rerun()
+        else:
+            st.error("رمز خاطئ")
+    return False
+
+
+def add_reminder(text, date):
+    reminders = st.session_state.get("reminders", [])
+    reminders.append({"text": text, "date": str(date)})
+    st.session_state.reminders = reminders
+
+
+def render_reminders(lang="ar"):
+    reminders = st.session_state.get("reminders", [])
+    today = datetime.date.today()
+
+    st.subheader(t("reminders", lang))
+
+    with st.expander(t("add_reminder", lang), expanded=False):
+        rtext = st.text_input(t("reminder_text", lang), key="rtext")
+        rdate = st.date_input(
+            t("reminder_date", lang),
+            value=today + datetime.timedelta(days=7),
+            key="rdate",
+        )
+        if st.button(t("add_reminder", lang), key="add_rem_btn"):
+            if rtext.strip():
+                add_reminder(rtext.strip(), rdate)
+                st.rerun()
+
+    if not reminders:
+        st.info(t("no_reminders", lang))
+        return
+
+    for r in sorted(reminders, key=lambda x: x["date"]):
+        try:
+            r_date = datetime.date.fromisoformat(r["date"])
+        except Exception:
+            continue
+        delta = (r_date - today).days
+        if delta < 0:
+            st.error(f"{t('overdue', lang)} {r['text']} ({r['date']})")
+        elif delta == 0:
+            st.warning(f"{t('today', lang)} {r['text']}")
+        elif delta <= 7:
+            st.info(f"{t('upcoming', lang)} ({delta} يوم): {r['text']} — {r['date']}")
