@@ -49,6 +49,40 @@ def money(v, cur="", decimals=2):
     return f"{s} {cur}".strip() if cur else s
 
 
+def safe_date(y, m, d):
+    """تاريخ آمن - يتعامل مع 29 فبراير في السنوات العادية"""
+    try:
+        return datetime.date(y, m, d)
+    except ValueError:
+        return datetime.date(y, 2, 28)
+
+
+def get_gosi_rates(join_date=None):
+    """
+    نسب التأمينات الاجتماعية (السعودية)
+    - النظام القديم (قبل 3 يوليو 2024): 9.75% موظف، 11.75% صاحب عمل
+    - النظام الجديد (متدرج): 2026 = 10.75% موظف، 12.75% صاحب عمل
+    """
+    today = datetime.date.today()
+    cutoff = datetime.date(2024, 7, 3)
+
+    if join_date is None:
+        join_date = today
+
+    if join_date < cutoff:
+        return 0.0975, 0.1175
+    else:
+        year = today.year
+        if year <= 2025:
+            return 0.10, 0.12
+        elif year == 2026:
+            return 0.1075, 0.1275
+        elif year == 2027:
+            return 0.1125, 0.1325
+        else:
+            return 0.115, 0.135
+
+
 def save_result(tool_name, **data):
     if "all_results" not in st.session_state:
         st.session_state.all_results = []
@@ -399,241 +433,3 @@ def backup_restore_ui():
                 st.error("❌ ملف غير صالح")
         except Exception as e:
             st.error(f"خطأ: {e}")
-
-
-def inject_local_storage_saver():
-    """يحفظ البيانات تلقائياً في localStorage المتصفح"""
-    import streamlit.components.v1 as components
-    data = {
-        "all_results": st.session_state.get("all_results", []),
-        "ecommerce_history": st.session_state.get("ecommerce_history", []),
-        "reminders": st.session_state.get("reminders", []),
-        "customers": st.session_state.get("customers", []),
-        "theme": st.session_state.get("theme", "تلقائي"),
-        "saved_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    }
-    data_json = json.dumps(data, ensure_ascii=False)
-    html = (
-        '<script>'
-        'try {'
-        '  localStorage.setItem("smart_merchant_data", ' + json.dumps(data_json) + ');'
-        '  console.log("✅ تم الحفظ التلقائي");'
-        '} catch(e) { console.log("localStorage error:", e); }'
-        '</script>'
-    )
-    components.html(html, height=0)
-
-
-def localStorage_load_button():
-    """زر استعادة البيانات من localStorage"""
-    import streamlit.components.v1 as components
-    html = (
-        '<button id="load_ls_btn" onclick="loadLocalStorage()" '
-        'style="background:linear-gradient(135deg,#10b981,#059669);'
-        'color:white;border:none;border-radius:14px;padding:12px 20px;'
-        'font-weight:700;width:100%;cursor:pointer;font-family:Cairo;'
-        'font-size:0.95rem;">'
-        '📂 استعادة من المتصفح</button>'
-        '<div id="ls_status" style="margin-top:8px; text-align:center; color:#64748b; font-size:0.85rem;"></div>'
-        '<script>'
-        'function loadLocalStorage() {'
-        '  try {'
-        '    var data = localStorage.getItem("smart_merchant_data");'
-        '    var status = document.getElementById("ls_status");'
-        '    if (!data) {'
-        '      status.innerText = "⚠️ لا توجد بيانات محفوظة في المتصفح";'
-        '      status.style.color = "#f59e0b";'
-        '      return;'
-        '    }'
-        '    var parsed = JSON.parse(data);'
-        '    var content = JSON.stringify(parsed, null, 2);'
-        '    var blob = new Blob([content], {type: "application/json"});'
-        '    var url = URL.createObjectURL(blob);'
-        '    var a = document.createElement("a");'
-        '    a.href = url;'
-        '    a.download = "local_backup_" + new Date().toISOString().slice(0,10) + ".json";'
-        '    a.click();'
-        '    status.innerText = "✅ تم تنزيل البيانات - ارفعها من قسم الاستعادة";'
-        '    status.style.color = "#10b981";'
-        '  } catch(e) {'
-        '    document.getElementById("ls_status").innerText = "❌ خطأ: " + e.message;'
-        '  }'
-        '}'
-        '</script>'
-    )
-    components.html(html, height=130)
-
-
-def get_smart_alerts():
-    """توليد تنبيهات ذكية بناءً على البيانات"""
-    alerts = []
-    now = datetime.datetime.now()
-    today = datetime.date.today()
-
-    reminders = st.session_state.get("reminders", [])
-    for r in reminders:
-        try:
-            r_date = datetime.date.fromisoformat(r["date"])
-            delta = (r_date - today).days
-            if delta < 0:
-                alerts.append(("error", f"⚠️ تنبيه متأخر: {r['text']}"))
-            elif delta == 0:
-                alerts.append(("warning", f"⏰ اليوم: {r['text']}"))
-            elif delta <= 3:
-                alerts.append(("info", f"📅 بعد {delta} أيام: {r['text']}"))
-        except Exception:
-            pass
-
-    customers = st.session_state.get("customers", [])
-    if customers:
-        top_customer = max(customers, key=lambda c: c.get("إجمالي المشتريات", 0))
-        if top_customer.get("إجمالي المشتريات", 0) > 1000:
-            alerts.append(
-                ("success", f"⭐ عميل VIP: {top_customer.get('الاسم', '')} — {money(top_customer.get('إجمالي المشتريات', 0))}")
-            )
-
-    results = st.session_state.get("all_results", [])
-    if len(results) > 0:
-        today_str = today.strftime("%Y-%m-%d")
-        today_ops = [r for r in results if r.get("التاريخ", "").startswith(today_str)]
-        if len(today_ops) >= 5:
-            alerts.append(("success", f"🎉 أنجزت {len(today_ops)} عملية اليوم!"))
-
-    theme = st.session_state.get("theme", "تلقائي")
-    hour = now.hour
-    if theme == "تلقائي":
-        if hour >= 22:
-            alerts.append(("info", "🌙 وقت متأخر - لا تنسَ أخذ قسط من الراحة"))
-        elif 6 <= hour < 9:
-            alerts.append(("success", "☀️ صباح الخير! يوم موفق"))
-
-    return alerts
-
-
-def render_smart_alerts():
-    """عرض التنبيهات الذكية"""
-    alerts = get_smart_alerts()
-    if not alerts:
-        return
-    for kind, msg in alerts:
-        if kind == "success":
-            st.success(msg)
-        elif kind == "warning":
-            st.warning(msg)
-        elif kind == "error":
-            st.error(msg)
-        else:
-            st.info(msg)
-
-
-def render_analytics_dashboard():
-    """لوحة تحليلات متقدمة"""
-    results = st.session_state.get("all_results", [])
-    customers = st.session_state.get("customers", [])
-    ecom = st.session_state.get("ecommerce_history", [])
-
-    total_ops = len(results)
-    total_customers = len(customers)
-    total_products = len(ecom)
-
-    st.markdown(
-        '<div class="stat-grid">'
-        '<div class="stat-card">'
-        '<div class="stat-icon">📊</div>'
-        '<div class="stat-value">' + str(total_ops) + '</div>'
-        '<div class="stat-label">إجمالي العمليات</div>'
-        '</div>'
-        '<div class="stat-card">'
-        '<div class="stat-icon">👥</div>'
-        '<div class="stat-value">' + str(total_customers) + '</div>'
-        '<div class="stat-label">عملاء مسجلون</div>'
-        '</div>'
-        '<div class="stat-card">'
-        '<div class="stat-icon">📦</div>'
-        '<div class="stat-value">' + str(total_products) + '</div>'
-        '<div class="stat-label">منتجات محللة</div>'
-        '</div>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
-
-    if not results and not customers:
-        st.info("📭 لا توجد بيانات كافية للتحليل. ابدأ باستخدام الحاسبات وأضف عملاء.")
-        return
-
-    try:
-        import plotly.express as px
-        HAS_PLOTLY = True
-    except ImportError:
-        HAS_PLOTLY = False
-
-    st.markdown('<h2 class="section-title">📅 نشاط آخر 7 أيام</h2>', unsafe_allow_html=True)
-
-    today = datetime.date.today()
-    last_7 = []
-    for i in range(6, -1, -1):
-        day = today - datetime.timedelta(days=i)
-        day_str = day.strftime("%Y-%m-%d")
-        count = len([r for r in results if r.get("التاريخ", "").startswith(day_str)])
-        last_7.append({"اليوم": day.strftime("%m-%d"), "العدد": count})
-
-    df_week = pd.DataFrame(last_7)
-
-    if HAS_PLOTLY:
-        fig = px.bar(
-            df_week, x="اليوم", y="العدد",
-            labels={"اليوم": "التاريخ", "العدد": "عدد العمليات"},
-            color="العدد", color_continuous_scale="Purples",
-        )
-        fig.update_layout(height=300, showlegend=False, font=dict(family="Cairo"),
-                          margin=dict(l=10, r=10, t=30, b=10))
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.bar_chart(df_week.set_index("اليوم"))
-
-    if customers:
-        st.markdown('<h2 class="section-title">👑 أفضل 5 عملاء</h2>', unsafe_allow_html=True)
-        top5 = sorted(customers, key=lambda c: c.get("إجمالي المشتريات", 0), reverse=True)[:5]
-        for i, c in enumerate(top5, 1):
-            medal = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"][i - 1]
-            st.markdown(
-                f"**{medal} {c.get('الاسم', '')}** — {money(c.get('إجمالي المشتريات', 0))} "
-                f"({c.get('عدد الطلبات', 0)} طلب)"
-            )
-
-    if ecom:
-        st.markdown('<h2 class="section-title">💰 أعلى المنتجات ربحاً</h2>', unsafe_allow_html=True)
-        top_products = sorted(ecom, key=lambda p: p.get("الربح الصافي", 0), reverse=True)[:5]
-        for i, p in enumerate(top_products, 1):
-            medal = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"][i - 1]
-            st.markdown(
-                f"**{medal} {p.get('اسم المنتج', '')}** — ربح: {money(p.get('الربح الصافي', 0))} "
-                f"(هامش {p.get('هامش %', 0)}%)"
-            )
-
-    if results:
-        st.markdown('<h2 class="section-title">🏆 أكثر الأدوات استخداماً</h2>', unsafe_allow_html=True)
-        tool_counts = {}
-        for r in results:
-            tool = r.get("الأداة", "")
-            tool_counts[tool] = tool_counts.get(tool, 0) + 1
-        top_tools = sorted(tool_counts.items(), key=lambda x: x[1], reverse=True)[:5]
-        for i, (tool, count) in enumerate(top_tools, 1):
-            medal = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"][i - 1]
-            st.markdown(f"**{medal} {tool}** — {count} مرة")
-
-    st.markdown('<h2 class="section-title">📈 ملخص عام</h2>', unsafe_allow_html=True)
-
-    if customers:
-        total_revenue = sum(c.get("إجمالي المشتريات", 0) for c in customers)
-        st.metric("💰 إجمالي المشتريات", money(total_revenue))
-
-        if results:
-            first_date_str = results[0].get("التاريخ", "").split(" ")[0]
-            try:
-                first_date = datetime.date.fromisoformat(first_date_str)
-                days_active = (today - first_date).days + 1
-                avg_per_day = total_revenue / days_active if days_active > 0 else 0
-                st.metric("📅 متوسط يومي", money(avg_per_day))
-            except Exception:
-                pass
