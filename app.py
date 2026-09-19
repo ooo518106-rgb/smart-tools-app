@@ -7,7 +7,7 @@ from io import BytesIO
 from helpers import (
     money, save_result, quick_save_button, copy_box,
     export_to_excel, page_header, share_buttons,
-    fetch_currency_rates,
+    fetch_currency_rates, currency_label,
 )
 
 try:
@@ -264,7 +264,7 @@ if tool_choice == "🏠 الرئيسية":
     c1, c2, c3 = st.columns(3)
     c1.metric("🛠️ عدد الأدوات", "30")
     c2.metric("📊 عمليات محفوظة", total_ops)
-    c3.metric("💰 عملات مدعومة", "8")
+    c3.metric("🌍 عملات مدعومة", "+160")
 
     st.divider()
 
@@ -274,7 +274,7 @@ if tool_choice == "🏠 الرئيسية":
     - 📦 **حاسبة التجارة** — احسب أرباح منتجاتك
     - 🏪 **عمولة المنصات** — سلة، زد، شوبيفاي
     - 📢 **حاسبة الإعلانات** — ROAS و CPA
-    - 🕋 **زكاة المال** — حساب سنوي
+    - 💱 **محول العملات** — أكثر من 160 عملة
     """)
 
     if total_ops > 0:
@@ -470,10 +470,10 @@ elif tool_choice == "💳 رسوم تابي وتمارا":
     )
 
     quick_save_button("tamara", "تابي/تمارا", {
-        "السعر": price,
-        "العمولة": round(fee_amount, 2),
-        "الضريبة": round(vat_amount, 2),
-        "الصافي": round(net, 2),
+        "الس       عر": price,
+        "العمولة": " round(fee_amount, 2الص),
+        "الضريافيبة": round(vat_amount,": round 2),
+(net, 2),
         "العملة": currency,
     })
 
@@ -1140,25 +1140,57 @@ elif tool_choice == "🛡️ حاسبة إدارة المخاطر":
 
 
 elif tool_choice == "💱 محول العملات":
-    page_header("💱", "محول العملات", "أسعار محدثة تلقائياً")
+    page_header("💱", "محول العملات", "أسعار محدثة تلقائياً - جميع عملات العالم")
 
     with st.spinner("🌍 تحديث الأسعار..."):
         rates = fetch_currency_rates()
 
-    col1, col2 = st.columns(2)
-    with col1:
-        fr = st.selectbox("من", list(rates.keys()), index=1)
-    with col2:
-        to = st.selectbox("إلى", list(rates.keys()), index=0)
+    if not rates:
+        st.error("⚠️ تعذر جلب الأسعار. جرّب لاحقاً.")
+    else:
+        codes = sorted(rates.keys())
 
-    amt = st.number_input("المبلغ", min_value=0.0, value=100.0, step=10.0)
+        common = [
+            "USD", "SAR", "AED", "KWD", "OMR", "QAR", "BHD", "EGP",
+            "JOD", "EUR", "GBP", "TRY", "INR", "PKR", "CNY", "JPY",
+        ]
+        ordered = [c for c in common if c in codes] + [c for c in codes if c not in common]
 
-    usd = amt / rates[fr]
-    result = usd * rates[to]
+        col1, col2 = st.columns(2)
+        with col1:
+            fr = st.selectbox(
+                "من", ordered,
+                index=1 if "SAR" in ordered else 0,
+                format_func=currency_label,
+            )
+        with col2:
+            to = st.selectbox(
+                "إلى", ordered,
+                index=0,
+                format_func=currency_label,
+            )
 
-    st.metric("النتيجة", f"{money(result, '', 4)}")
-    st.info(f"1 {fr} = {money(rates[to] / rates[fr], '', 4)} {to}")
-    st.caption("✅ الأسعار تُحدّث تلقائياً كل ساعة | فشل الاتصال → قيم تقريبية")
+        amt = st.number_input("المبلغ", min_value=0.0, value=100.0, step=10.0)
+
+        usd = amt / rates[fr]
+        result = usd * rates[to]
+
+        st.divider()
+        c1, c2 = st.columns(2)
+        c1.metric("النتيجة", f"{money(result, '', 4)} {to}")
+        c2.metric("المبلغ الأصلي", f"{money(amt)} {fr}")
+
+        st.divider()
+        st.info(f"💱 1 {fr} = {money(rates[to] / rates[fr], '', 4)} {to}")
+        st.info(f"💱 1 {to} = {money(rates[fr] / rates[to], '', 4)} {fr}")
+
+        st.caption(f"✅ {len(rates)} عملة مدعومة | تُحدّث كل ساعة تلقائياً")
+
+        share_buttons(
+            f"💱 تحويل العملات:\n"
+            f"{money(amt)} {fr} = {money(result, '', 4)} {to}\n"
+            f"من تطبيق أدوات التاجر الذكي"
+        )
 
 
 elif tool_choice == "🗓️ حاسبة أيام العمل":
