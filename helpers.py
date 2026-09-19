@@ -96,7 +96,12 @@ def export_to_excel(df_dict, filename="report.xlsx"):
         buffer = BytesIO()
         with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
             for sheet_name, df in df_dict.items():
-                safe_name = sheet_name[:31]
+                safe_name = str(sheet_name)
+                for ch in ["/", "\\", "?", "*", "[", "]", ":"]:
+                    safe_name = safe_name.replace(ch, "-")
+                safe_name = safe_name.strip()[:31]
+                if not safe_name:
+                    safe_name = "Sheet"
                 df.to_excel(writer, sheet_name=safe_name, index=False)
         buffer.seek(0)
         return buffer.getvalue()
