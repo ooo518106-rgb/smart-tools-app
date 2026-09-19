@@ -56,7 +56,7 @@ def save_result(tool_name, **data):
         **data,
     }
     st.session_state.all_results.append(record)
-    st.toast("✅ تم الحفظ", icon="💾")
+    st.toast("تم الحفظ", icon="💾")
 
 
 def quick_save_button(key, tool_name, data_dict):
@@ -85,19 +85,19 @@ def share_buttons(text, title="نتيجتي"):
     with col1:
         st.markdown(
             '<a href="' + wa + '" target="_blank" class="share-btn" '
-            'style="background:#25D366;">واتساب 💬</a>',
+            'style="background:#25D366;">واتساب</a>',
             unsafe_allow_html=True,
         )
     with col2:
         st.markdown(
             '<a href="' + tw + '" target="_blank" class="share-btn" '
-            'style="background:#1DA1F2;">تويتر 🐦</a>',
+            'style="background:#1DA1F2;">تويتر</a>',
             unsafe_allow_html=True,
         )
     with col3:
         st.markdown(
             '<a href="' + tg + '" target="_blank" class="share-btn" '
-            'style="background:#0088cc;">تيليجرام ✈️</a>',
+            'style="background:#0088cc;">تيليجرام</a>',
             unsafe_allow_html=True,
         )
 
@@ -167,14 +167,8 @@ def check_pin():
     if st.session_state.get("pin_ok"):
         return True
 
-    st.markdown(
-        '<div class="pin-box">'
-        '<h2>🔐 التطبيق محمي</h2>'
-        '<p>أدخل رمز الدخول للمتابعة</p>'
-        '</div>',
-        unsafe_allow_html=True,
-    )
-    pin = st.text_input("الرمز:", type="password", key="pin_input")
+    st.markdown("### 🔐 التطبيق محمي")
+    pin = st.text_input("أدخل الرمز:", type="password", key="pin_input")
     if st.button("🚀 دخول", use_container_width=True):
         if pin == correct:
             st.session_state.pin_ok = True
@@ -188,10 +182,7 @@ def render_reminders():
     reminders = st.session_state.get("reminders", [])
     today = datetime.date.today()
 
-    st.markdown(
-        '<h2 class="section-title">🔔 التنبيهات</h2>',
-        unsafe_allow_html=True,
-    )
+    st.subheader("🔔 التنبيهات")
 
     with st.expander("➕ إضافة تنبيه جديد", expanded=False):
         rtext = st.text_input("نص التنبيه:", key="rtext")
@@ -207,10 +198,7 @@ def render_reminders():
                 st.rerun()
 
     if not reminders:
-        st.markdown(
-            '<div class="empty-state">لا توجد تنبيهات حالياً</div>',
-            unsafe_allow_html=True,
-        )
+        st.info("لا توجد تنبيهات حالياً")
         return
 
     for r in sorted(reminders, key=lambda x: x["date"]):
