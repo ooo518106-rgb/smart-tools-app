@@ -6,7 +6,8 @@ from io import BytesIO
 
 from helpers import (
     money, save_result, quick_save_button, copy_box,
-    export_to_excel, page_header,
+    export_to_excel, page_header, share_buttons,
+    fetch_currency_rates,
 )
 
 try:
@@ -31,48 +32,69 @@ st.set_page_config(
 defaults = {
     "ecommerce_history": [],
     "all_results": [],
-    "dark_mode": False,
+    "theme": "فاتح",
     "search_query": "",
-    "recent_tools": [],
 }
 for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
 
-def apply_theme(dark):
-    if dark:
-        bg = "linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%)"
-        card_bg = "#16213e"
-        card_border = "#4a7cff"
-        text_main = "#a8c0ff"
-        text_sub = "#8899bb"
-        input_bg = "#1a1a2e"
-        input_border = "#2a3a5e"
-        field_text = "#e0e0e0"
-    else:
-        bg = "linear-gradient(135deg, #f5f7fa 0%, #e8ecf5 100%)"
-        card_bg = "#ffffff"
-        card_border = "#2a5298"
-        text_main = "#1e3c72"
-        text_sub = "#5a6c8a"
-        input_bg = "#ffffff"
-        input_border = "#e0e6f0"
-        field_text = "#1e3c72"
+def apply_theme(theme_name):
+    themes = {
+        "فاتح": {
+            "bg": "linear-gradient(135deg, #f5f7fa 0%, #e8ecf5 100%)",
+            "card": "#ffffff", "accent": "#2a5298",
+            "text": "#1e3c72", "sub": "#5a6c8a",
+            "sidebar1": "#1e3c72", "sidebar2": "#2a5298",
+            "field_bg": "#ffffff", "field_border": "#e0e6f0",
+            "field_text": "#1e3c72",
+        },
+        "داكن": {
+            "bg": "linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%)",
+            "card": "#16213e", "accent": "#4a7cff",
+            "text": "#a8c0ff", "sub": "#8899bb",
+            "sidebar1": "#0a0a15", "sidebar2": "#16213e",
+            "field_bg": "#1a1a2e", "field_border": "#2a3a5e",
+            "field_text": "#e0e0e0",
+        },
+        "محيط": {
+            "bg": "linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%)",
+            "card": "#ffffff", "accent": "#00838f",
+            "text": "#006064", "sub": "#4dd0e1",
+            "sidebar1": "#006064", "sidebar2": "#00838f",
+            "field_bg": "#ffffff", "field_border": "#80deea",
+            "field_text": "#006064",
+        },
+        "غروب": {
+            "bg": "linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%)",
+            "card": "#ffffff", "accent": "#e65100",
+            "text": "#bf360c", "sub": "#ff8a65",
+            "sidebar1": "#bf360c", "sidebar2": "#e65100",
+            "field_bg": "#ffffff", "field_border": "#ffcc80",
+            "field_text": "#bf360c",
+        },
+        "غابة": {
+            "bg": "linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)",
+            "card": "#ffffff", "accent": "#2e7d32",
+            "text": "#1b5e20", "sub": "#66bb6a",
+            "sidebar1": "#1b5e20", "sidebar2": "#2e7d32",
+            "field_bg": "#ffffff", "field_border": "#a5d6a7",
+            "field_text": "#1b5e20",
+        },
+    }
+
+    t = themes.get(theme_name, themes["فاتح"])
 
     st.markdown(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
-
 html, body {{ font-family: 'Cairo', sans-serif; }}
-
-.stApp {{ background: {bg}; }}
-
+.stApp {{ background: {t['bg']}; }}
 footer {{visibility: hidden;}}
 #MainMenu {{visibility: hidden;}}
-
 .main-title {{
-    background: linear-gradient(90deg, #1e3c72 0%, #2a5298 50%, #00b4db 100%);
+    background: linear-gradient(90deg, {t['sidebar1']} 0%, {t['accent']} 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     font-size: 1.9rem;
@@ -81,37 +103,31 @@ footer {{visibility: hidden;}}
     margin-bottom: 0.3rem;
     line-height: 1.4;
 }}
-
 .sub-title {{
     text-align: center;
-    color: {text_sub};
+    color: {t['sub']};
     font-size: 0.9rem;
     margin-bottom: 1.5rem;
 }}
-
 [data-testid="stMetric"] {{
-    background: {card_bg};
+    background: {t['card']};
     padding: 14px 12px;
     border-radius: 12px;
-    border-right: 4px solid {card_border};
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+    border-right: 4px solid {t['accent']};
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
 }}
-
 [data-testid="stMetricLabel"] {{
-    color: {text_sub} !important;
+    color: {t['sub']} !important;
     font-size: 0.8rem !important;
     font-weight: 600 !important;
 }}
-
 [data-testid="stMetricValue"] {{
-    color: {text_main} !important;
+    color: {t['text']} !important;
     font-weight: 700 !important;
 }}
-
 section[data-testid="stSidebar"] {{
-    background: linear-gradient(180deg, #1e3c72 0%, #2a5298 100%);
+    background: linear-gradient(180deg, {t['sidebar1']} 0%, {t['sidebar2']} 100%);
 }}
-
 section[data-testid="stSidebar"] h1,
 section[data-testid="stSidebar"] h2,
 section[data-testid="stSidebar"] h3,
@@ -120,7 +136,6 @@ section[data-testid="stSidebar"] label,
 section[data-testid="stSidebar"] span {{
     color: #ffffff !important;
 }}
-
 section[data-testid="stSidebar"] .stRadio label {{
     background: rgba(255, 255, 255, 0.08);
     padding: 8px 12px;
@@ -129,21 +144,8 @@ section[data-testid="stSidebar"] .stRadio label {{
     cursor: pointer;
     display: block;
 }}
-
-section[data-testid="stSidebar"] .stRadio label:hover {{
-    background: rgba(255, 255, 255, 0.18);
-}}
-
-section[data-testid="stSidebar"] input,
-section[data-testid="stSidebar"] textarea {{
-    background: rgba(255, 255, 255, 0.1) !important;
-    color: #ffffff !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    border-radius: 8px !important;
-}}
-
 .stButton > button {{
-    background: linear-gradient(90deg, #2a5298 0%, #00b4db 100%);
+    background: linear-gradient(90deg, {t['sidebar1']} 0%, {t['accent']} 100%);
     color: white;
     border: none;
     border-radius: 10px;
@@ -152,54 +154,31 @@ section[data-testid="stSidebar"] textarea {{
     font-family: 'Cairo', sans-serif;
     width: 100%;
 }}
-
-.stButton > button:hover {{
-    color: white;
-    box-shadow: 0 6px 16px rgba(42, 82, 152, 0.3);
-}}
-
 .stDownloadButton > button {{
     background: linear-gradient(90deg, #11998e 0%, #38ef7d 100%);
     color: white;
     border: none;
     border-radius: 10px;
     font-weight: 600;
-    font-family: 'Cairo', sans-serif;
     width: 100%;
 }}
-
 .stTextInput input, .stNumberInput input, .stTextArea textarea {{
     border-radius: 10px !important;
-    border: 2px solid {input_border} !important;
+    border: 2px solid {t['field_border']} !important;
     font-family: 'Cairo', sans-serif !important;
-    background: {input_bg} !important;
-    color: {field_text} !important;
+    background: {t['field_bg']} !important;
+    color: {t['field_text']} !important;
 }}
-
-.stAlert {{
-    border-radius: 12px !important;
-    font-family: 'Cairo', sans-serif !important;
-}}
-
 h1, h2, h3 {{
     font-family: 'Cairo', sans-serif !important;
-    color: {text_main} !important;
-}}
-
-div[data-testid="stDataFrame"] {{
-    border-radius: 12px;
-    overflow: hidden;
+    color: {t['text']} !important;
 }}
 </style>
 """, unsafe_allow_html=True)
 
 
-apply_theme(st.session_state.dark_mode)
+apply_theme(st.session_state.theme)
 
-
-# ============================================================
-# القائمة الجانبية
-# ============================================================
 st.sidebar.markdown("### 💰 أدوات التاجر الذكي")
 
 search_query = st.sidebar.text_input(
@@ -207,16 +186,20 @@ search_query = st.sidebar.text_input(
     value=st.session_state.search_query,
     placeholder="مثال: زكاة، ضريبة...",
 )
+st.session_state.search_query = search_query
 
-if search_query != st.session_state.search_query:
-    st.session_state.search_query = search_query
+theme_options = ["☀️ فاتح", "🌙 داكن", "🌊 محيط", "🌅 غروب", "🌲 غابة"]
+theme_names = ["فاتح", "داكن", "محيط", "غروب", "غابة"]
+default_idx = 0
+for i, name in enumerate(theme_names):
+    if name == st.session_state.theme:
+        default_idx = i
+        break
 
-dark_toggle = st.sidebar.toggle(
-    "🌙 الوضع الليلي",
-    value=st.session_state.dark_mode,
-)
-if dark_toggle != st.session_state.dark_mode:
-    st.session_state.dark_mode = dark_toggle
+theme_pick = st.sidebar.selectbox("🎨 الثيم", theme_options, index=default_idx)
+theme_key = theme_pick.split()[-1]
+if theme_key != st.session_state.theme:
+    st.session_state.theme = theme_key
     st.rerun()
 
 st.sidebar.markdown("---")
@@ -331,6 +314,18 @@ elif tool_choice == "📊 لوحة التقارير الموحدة":
         st.bar_chart(tool_counts)
 
         st.divider()
+        st.subheader("📈 النشاط اليومي")
+        df_all["اليوم"] = df_all["التاريخ"].str.split(" ").str[0]
+        daily = df_all.groupby("اليوم").size()
+        st.line_chart(daily)
+
+        st.divider()
+        st.subheader("🥧 توزيع الأدوات")
+        dist = tool_counts.reset_index()
+        dist.columns = ["الأداة", "عدد المرات"]
+        st.dataframe(dist, use_container_width=True)
+
+        st.divider()
         col1, col2, col3 = st.columns(3)
 
         with col1:
@@ -407,6 +402,14 @@ elif tool_choice == "📦 حاسبة التجارة الإلكترونية":
         f"الهامش: {margin:.1f}%"
     )
 
+    share_buttons(
+        f"📦 نتيجة حاسبة التجارة:\n"
+        f"التكلفة: {money(total_cost, currency)}\n"
+        f"الربح الصافي: {money(net_profit, currency)}\n"
+        f"الهامش: {margin:.1f}%\n"
+        f"من تطبيق أدوات التاجر الذكي 💰"
+    )
+
     st.divider()
     product_name = st.text_input("اسم المنتج (اختياري للحفظ):", placeholder="سماعة بلوتوث")
 
@@ -473,6 +476,11 @@ elif tool_choice == "💳 رسوم تابي وتمارا":
     c2.metric("الضريبة", money(vat_amount, currency))
     c3.metric("الصافي", money(net, currency))
 
+    share_buttons(
+        f"💳 الصافي بعد تابي/تمارا: {money(net, currency)}\n"
+        f"من تطبيق أدوات التاجر الذكي"
+    )
+
     quick_save_button("tamara", "تابي/تمارا", {
         "السعر": price,
         "العمولة": round(fee_amount, 2),
@@ -522,6 +530,13 @@ elif tool_choice == "🏪 عمولة المنصات (سلة/زد)":
     c4.metric("إجمالي الخصم", money(total_deductions, currency))
     c5.metric("الصافي", money(price - total_deductions, currency))
     c6.metric("الربح", money(net_profit, currency), delta="ربح" if net_profit > 0 else "خسارة")
+
+    share_buttons(
+        f"🏪 نتيجة عمولة {platform}:\n"
+        f"السعر: {money(price, currency)}\n"
+        f"الربح الصافي: {money(net_profit, currency)}\n"
+        f"من تطبيق أدوات التاجر الذكي"
+    )
 
     quick_save_button("platform", f"عمولة {platform}", {
         "المنصة": platform,
@@ -575,6 +590,13 @@ elif tool_choice == "📢 حاسبة الإعلانات ROAS":
         st.warning("⚡ الربح ضعيف.")
     else:
         st.success("🎉 حملة مربحة!")
+
+    share_buttons(
+        f"📢 نتيجة حاسبة الإعلانات:\n"
+        f"ROAS: {roas:.2f}x\n"
+        f"الربح الصافي: {money(net_profit, currency)}\n"
+        f"من تطبيق أدوات التاجر الذكي"
+    )
 
     quick_save_button("roas", "الإعلانات", {
         "الإنفاق": ad_spend,
@@ -636,6 +658,12 @@ elif tool_choice == "🏦 حاسبة القروض والأقساط":
         c2.metric("الفوائد", money(interest, currency))
         c3.metric("الإجمالي", money(total, currency))
 
+        share_buttons(
+            f"🏦 القسط الشهري: {money(payment, currency)}\n"
+            f"الإجمالي: {money(total, currency)}\n"
+            f"من تطبيق أدوات التاجر الذكي"
+        )
+
         quick_save_button("loan", "قرض", {
             "المبلغ": loan,
             "القسط": round(payment, 2),
@@ -694,6 +722,12 @@ elif tool_choice == "🕋 حاسبة زكاة المال":
         st.warning("⚠️ أقل من النصاب.")
     else:
         st.metric("الزكاة", money(zakat))
+
+        share_buttons(
+            f"🕋 مقدار الزكاة: {money(zakat)}\n"
+            f"من تطبيق أدوات التاجر الذكي"
+        )
+
         quick_save_button("zakat", "زكاة", {"المال": wealth, "الزكاة": round(zakat, 2)})
 
 
@@ -1181,16 +1215,13 @@ elif tool_choice == "🛡️ حاسبة إدارة المخاطر":
 
 
 # ============================================================
-# 24. محول العملات
+# 24. محول العملات (أسعار حية)
 # ============================================================
 elif tool_choice == "💱 محول العملات":
-    page_header("💱", "محول العملات", "أسعار تقريبية")
+    page_header("💱", "محول العملات", "أسعار محدثة تلقائياً")
 
-    rates = {
-        "USD": 1.0, "SAR": 3.75, "AED": 3.67, "KWD": 0.31,
-        "OMR": 0.385, "EGP": 48.5, "EUR": 0.92, "GBP": 0.79,
-        "QAR": 3.64, "BHD": 0.376,
-    }
+    with st.spinner("🌍 تحديث الأسعار..."):
+        rates = fetch_currency_rates()
 
     col1, col2 = st.columns(2)
     with col1:
@@ -1205,7 +1236,7 @@ elif tool_choice == "💱 محول العملات":
 
     st.metric("النتيجة", f"{money(result, '', 4)}")
     st.info(f"1 {fr} = {money(rates[to] / rates[fr], '', 4)} {to}")
-    st.caption("⚠️ الأسعار تقريبية.")
+    st.caption("✅ الأسعار تُحدّث تلقائياً كل ساعة | فشل الاتصال → قيم تقريبية")
 
 
 # ============================================================
