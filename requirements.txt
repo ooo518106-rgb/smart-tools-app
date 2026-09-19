@@ -6,3 +6,4 @@ openpyxl
 requests
 hijri-converter
 fpdf2
+plotly
