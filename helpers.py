@@ -213,3 +213,46 @@ def render_reminders():
             st.warning(f"⏰ اليوم! {r['text']}")
         elif delta <= 7:
             st.info(f"📅 {r['text']} — بعد {delta} يوم")
+
+
+def get_hijri_date():
+    try:
+        from hijri_converter import Gregorian
+        today = datetime.date.today()
+        h = Gregorian(today.year, today.month, today.day).to_hijri()
+        months_ar = [
+            "محرم", "صفر", "ربيع الأول", "ربيع الثاني",
+            "جمادى الأولى", "جمادى الآخرة", "رجب", "شعبان",
+            "رمضان", "شوال", "ذو القعدة", "ذو الحجة",
+        ]
+        return f"{h.day} {months_ar[h.month - 1]} {h.year} هـ"
+    except Exception:
+        return ""
+
+
+def print_button(text_to_print, label="🖨️ طباعة"):
+    import streamlit.components.v1 as components
+    import json
+
+    text_json = json.dumps(text_to_print)
+    html = (
+        '<button onclick="printContent()" '
+        'style="background:linear-gradient(135deg,#6366f1,#ec4899);'
+        'color:white;border:none;border-radius:14px;padding:12px 20px;'
+        'font-weight:700;width:100%;cursor:pointer;font-family:Cairo;'
+        'font-size:0.95rem;">' + label + '</button>'
+        '<script>'
+        'function printContent() {'
+        '  var text = ' + text_json + ';'
+        '  var w = window.open("", "", "width=800,height=600");'
+        '  w.document.write("<html dir=\'rtl\'><head><title>طباعة</title>");'
+        '  w.document.write("<style>body{font-family:Cairo,Arial;padding:40px;line-height:2;}pre{white-space:pre-wrap;font-size:16px;}</style>");'
+        '  w.document.write("</head><body><h2>أدوات التاجر الذكي</h2><pre>");'
+        '  w.document.write(text);'
+        '  w.document.write("</pre></body></html>");'
+        '  w.document.close();'
+        '  setTimeout(function(){w.print();}, 300);'
+        '}'
+        '</script>'
+    )
+    components.html(html, height=70)
