@@ -1,593 +1,231 @@
 import streamlit as st
-import datetime
 import pandas as pd
+import datetime
 import urllib.parse
 from io import BytesIO
 
-from helpers import (
-    money, save_result, quick_save_button, copy_box,
-    export_to_excel, page_header, share_buttons,
-    fetch_currency_rates, currency_label,
-    check_pin, render_reminders,
-)
-
-try:
-    from dateutil.relativedelta import relativedelta
-    HAS_DATEUTIL = True
-except ImportError:
-    HAS_DATEUTIL = False
-
-try:
-    import qrcode
-    HAS_QR = True
-except ImportError:
-    HAS_QR = False
-
-st.set_page_config(
-    page_title="أدوات التاجر الذكي",
-    page_icon="💼",
-    layout="centered",
-    initial_sidebar_state="expanded",
-)
-
-defaults = {
-    "ecommerce_history": [],
-    "all_results": [],
-    "theme": "فاتح",
-    "search_query": "",
-    "reminders": [],
-    "pin_ok": False,
+CURRENCY_NAMES_AR = {
+    "USD": "دولار أمريكي", "SAR": "ريال سعودي", "AED": "درهم إماراتي",
+    "KWD": "دينار كويتي", "OMR": "ريال عماني", "QAR": "ريال قطري",
+    "BHD": "دينار بحريني", "EGP": "جنيه مصري", "JOD": "دينار أردني",
+    "LBP": "ليرة لبنانية", "SYP": "ليرة سورية", "IQD": "دينار عراقي",
+    "YER": "ريال يمني", "MAD": "درهم مغربي", "DZD": "دينار جزائري",
+    "TND": "دينار تونسي", "LYD": "دينار ليبي", "SDG": "جنيه سوداني",
+    "EUR": "يورو", "GBP": "جنيه إسترليني", "CHF": "فرنك سويسري",
+    "TRY": "ليرة تركية", "IRR": "ريال إيراني", "PKR": "روبية باكستانية",
+    "INR": "روبية هندية", "BDT": "تاكا بنغلاديشية", "IDR": "روبية إندونيسية",
+    "MYR": "رينغيت ماليزي", "SGD": "دولار سنغافوري", "THB": "بات تايلندي",
+    "PHP": "بيزو فلبيني", "VND": "دونغ فيتنامي", "CNY": "يوان صيني",
+    "JPY": "ين ياباني", "KRW": "وون كوري", "HKD": "دولار هونغ كونغ",
+    "TWD": "دولار تايواني", "AUD": "دولار أسترالي", "NZD": "دولار نيوزيلندي",
+    "CAD": "دولار كندي", "MXN": "بيزو مكسيكي", "BRL": "ريال برازيلي",
+    "ARS": "بيزو أرجنتيني", "CLP": "بيزو تشيلي", "COP": "بيزو كولومبي",
+    "PEN": "سول بيروفي", "SEK": "كرونة سويدية", "NOK": "كرونة نرويجية",
+    "DKK": "كرونة دنماركية", "PLN": "زلوتي بولندي", "CZK": "كرونة تشيكية",
+    "HUF": "فورنت مجري", "RON": "ليو روماني", "BGN": "ليف بلغاري",
+    "RUB": "روبل روسي", "UAH": "هريفنيا أوكرانية", "GEL": "لاري جورجي",
+    "KZT": "تينغي كازاخستاني", "ILS": "شيكل إسرائيلي", "ZAR": "راند جنوب أفريقي",
+    "NGN": "نايرا نيجيري", "KES": "شلن كيني", "GHS": "سيدي غاني",
+    "MUR": "روبية موريشيوسية",
 }
-for k, v in defaults.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
 
 
-def apply_theme(theme_name):
-    themes = {
-        "فاتح": {
-            "bg": "linear-gradient(135deg, #eef2ff 0%, #fce7f3 100%)",
-            "card": "rgba(255, 255, 255, 0.85)",
-            "accent": "#6366f1",
-            "accent2": "#ec4899",
-            "text": "#1e293b",
-            "sub": "#64748b",
-            "sidebar1": "#4f46e5",
-            "sidebar2": "#7c3aed",
-            "field_bg": "rgba(255, 255, 255, 0.95)",
-            "field_border": "#e2e8f0",
-            "field_text": "#1e293b",
-            "border": "rgba(99, 102, 241, 0.15)",
-        },
-        "داكن": {
-            "bg": "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
-            "card": "rgba(30, 41, 59, 0.85)",
-            "accent": "#818cf8",
-            "accent2": "#f472b6",
-            "text": "#e2e8f0",
-            "sub": "#94a3b8",
-            "sidebar1": "#1e1b4b",
-            "sidebar2": "#312e81",
-            "field_bg": "rgba(30, 41, 59, 0.9)",
-            "field_border": "#334155",
-            "field_text": "#e2e8f0",
-            "border": "rgba(129, 140, 248, 0.2)",
-        },
-        "غروب": {
-            "bg": "linear-gradient(135deg, #fff7ed 0%, #fee2e2 100%)",
-            "card": "rgba(255, 255, 255, 0.85)",
-            "accent": "#ea580c",
-            "accent2": "#dc2626",
-            "text": "#7c2d12",
-            "sub": "#9a3412",
-            "sidebar1": "#c2410c",
-            "sidebar2": "#ea580c",
-            "field_bg": "rgba(255, 255, 255, 0.95)",
-            "field_border": "#fed7aa",
-            "field_text": "#7c2d12",
-            "border": "rgba(234, 88, 12, 0.15)",
-        },
-        "محيط": {
-            "bg": "linear-gradient(135deg, #ecfeff 0%, #cffafe 100%)",
-            "card": "rgba(255, 255, 255, 0.85)",
-            "accent": "#0891b2",
-            "accent2": "#06b6d4",
-            "text": "#164e63",
-            "sub": "#155e75",
-            "sidebar1": "#0e7490",
-            "sidebar2": "#0891b2",
-            "field_bg": "rgba(255, 255, 255, 0.95)",
-            "field_border": "#a5f3fc",
-            "field_text": "#164e63",
-            "border": "rgba(8, 145, 178, 0.15)",
-        },
-        "غابة": {
-            "bg": "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)",
-            "card": "rgba(255, 255, 255, 0.85)",
-            "accent": "#059669",
-            "accent2": "#10b981",
-            "text": "#064e3b",
-            "sub": "#065f46",
-            "sidebar1": "#047857",
-            "sidebar2": "#059669",
-            "field_bg": "rgba(255, 255, 255, 0.95)",
-            "field_border": "#a7f3d0",
-            "field_text": "#064e3b",
-            "border": "rgba(5, 150, 105, 0.15)",
-        },
+def currency_label(code):
+    name = CURRENCY_NAMES_AR.get(code, "")
+    if name:
+        return f"{code} - {name}"
+    return code
+
+
+def money(v, cur="", decimals=2):
+    if v is None:
+        return "0.00"
+    try:
+        s = f"{v:,.{decimals}f}"
+    except (ValueError, TypeError):
+        s = str(v)
+    return f"{s} {cur}".strip() if cur else s
+
+
+def save_result(tool_name, **data):
+    if "all_results" not in st.session_state:
+        st.session_state.all_results = []
+    record = {
+        "الأداة": tool_name,
+        "التاريخ": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
+        **data,
     }
-
-    th = themes.get(theme_name, themes["فاتح"])
-
-    st.markdown(f"""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Poppins:wght@600;700;800&display=swap');
-
-* {{
-    font-family: 'Cairo', sans-serif;
-}}
-
-html, body, [class*="css"] {{
-    font-family: 'Cairo', sans-serif;
-}}
-
-.stApp {{
-    background: {th['bg']};
-    background-attachment: fixed;
-}}
-
-footer {{visibility: hidden;}}
-#MainMenu {{visibility: hidden;}}
-[data-testid="stStatusWidget"] {{visibility: hidden;}}
-[data-testid="stToolbar"] {{visibility: hidden;}}
-
-/* ===== Hero Headers ===== */
-.page-hero {{
-    text-align: center;
-    padding: 20px 10px 24px;
-    margin-bottom: 12px;
-}}
-
-.page-hero-icon {{
-    font-size: 3.2rem;
-    margin-bottom: 8px;
-    display: inline-block;
-    filter: drop-shadow(0 4px 12px {th['border']});
-}}
-
-.page-title {{
-    background: linear-gradient(135deg, {th['sidebar1']} 0%, {th['accent2']} 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    font-size: 1.9rem;
-    font-weight: 900;
-    margin: 0;
-    padding: 0;
-    letter-spacing: -0.5px;
-    font-family: 'Cairo', sans-serif;
-}}
-
-.page-subtitle {{
-    color: {th['sub']};
-    font-size: 0.9rem;
-    margin: 8px 0 0;
-    font-weight: 500;
-}}
-
-.section-title {{
-    color: {th['text']};
-    font-size: 1.3rem;
-    font-weight: 800;
-    margin: 24px 0 12px;
-    padding-right: 10px;
-    border-right: 4px solid {th['accent']};
-}}
-
-/* ===== Stat Cards ===== */
-.stat-grid {{
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 12px;
-    margin: 16px 0;
-}}
-
-.stat-card {{
-    background: {th['card']};
-    backdrop-filter: blur(10px);
-    padding: 18px 16px;
-    border-radius: 20px;
-    border: 1px solid {th['border']};
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
-    text-align: center;
-    transition: transform 0.2s, box-shadow 0.2s;
-}}
-
-.stat-card:hover {{
-    transform: translateY(-3px);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
-}}
-
-.stat-icon {{
-    font-size: 1.8rem;
-    margin-bottom: 6px;
-}}
-
-.stat-value {{
-    font-size: 1.8rem;
-    font-weight: 900;
-    background: linear-gradient(135deg, {th['sidebar1']}, {th['accent2']});
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    font-family: 'Poppins', 'Cairo', sans-serif;
-    line-height: 1.1;
-}}
-
-.stat-label {{
-    color: {th['sub']};
-    font-size: 0.8rem;
-    font-weight: 600;
-    margin-top: 4px;
-}}
-
-/* ===== Metric Cards ===== */
-[data-testid="stMetric"] {{
-    background: {th['card']};
-    backdrop-filter: blur(10px);
-    padding: 16px 14px;
-    border-radius: 18px;
-    border: 1px solid {th['border']};
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
-    transition: transform 0.2s;
-}}
-
-[data-testid="stMetric"]:hover {{
-    transform: translateY(-2px);
-}}
-
-[data-testid="stMetricLabel"] {{
-    color: {th['sub']} !important;
-    font-size: 0.85rem !important;
-    font-weight: 600 !important;
-}}
-
-[data-testid="stMetricValue"] {{
-    color: {th['text']} !important;
-    font-weight: 800 !important;
-    font-family: 'Poppins', 'Cairo', sans-serif;
-}}
-
-/* ===== Sidebar ===== */
-section[data-testid="stSidebar"] {{
-    background: linear-gradient(180deg, {th['sidebar1']} 0%, {th['sidebar2']} 100%);
-    border-right: none;
-}}
-
-section[data-testid="stSidebar"] * {{
-    color: #ffffff !important;
-}}
-
-section[data-testid="stSidebar"] h3 {{
-    font-size: 1.1rem;
-    font-weight: 800;
-    padding: 8px 0;
-}}
-
-section[data-testid="stSidebar"] .stRadio label {{
-    background: rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(4px);
-    padding: 10px 14px;
-    border-radius: 12px;
-    margin-bottom: 5px;
-    cursor: pointer;
-    display: block;
-    font-size: 0.88rem;
-    font-weight: 500;
-    transition: all 0.2s;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-}}
-
-section[data-testid="stSidebar"] .stRadio label:hover {{
-    background: rgba(255, 255, 255, 0.18);
-    transform: translateX(-3px);
-    border-color: rgba(255, 255, 255, 0.2);
-}}
-
-section[data-testid="stSidebar"] input,
-section[data-testid="stSidebar"] textarea {{
-    background: rgba(255, 255, 255, 0.12) !important;
-    color: #ffffff !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    border-radius: 10px !important;
-}}
-
-section[data-testid="stSidebar"] input::placeholder {{
-    color: rgba(255, 255, 255, 0.6) !important;
-}}
-
-/* ===== Buttons ===== */
-.stButton > button {{
-    background: linear-gradient(135deg, {th['sidebar1']} 0%, {th['accent2']} 100%);
-    color: white !important;
-    border: none;
-    border-radius: 14px;
-    padding: 12px 20px;
-    font-weight: 700;
-    font-family: 'Cairo', sans-serif;
-    font-size: 0.95rem;
-    width: 100%;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
-    transition: all 0.2s;
-}}
-
-.stButton > button:hover {{
-    transform: translateY(-2px);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
-    color: white !important;
-}}
-
-.stDownloadButton > button {{
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white !important;
-    border: none;
-    border-radius: 14px;
-    padding: 12px 20px;
-    font-weight: 700;
-    font-family: 'Cairo', sans-serif;
-    width: 100%;
-    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.25);
-}}
-
-.stDownloadButton > button:hover {{
-    transform: translateY(-2px);
-    box-shadow: 0 10px 24px rgba(16, 185, 129, 0.35);
-    color: white !important;
-}}
-
-/* ===== Inputs ===== */
-.stTextInput input, .stNumberInput input, .stTextArea textarea {{
-    border-radius: 12px !important;
-    border: 1.5px solid {th['field_border']} !important;
-    font-family: 'Cairo', sans-serif !important;
-    background: {th['field_bg']} !important;
-    color: {th['field_text']} !important;
-    padding: 10px 14px !important;
-    transition: all 0.2s;
-}}
-
-.stTextInput input:focus, .stNumberInput input:focus, .stTextArea textarea:focus {{
-    border-color: {th['accent']} !important;
-    box-shadow: 0 0 0 3px {th['border']} !important;
-}}
-
-.stSelectbox > div > div {{
-    border-radius: 12px !important;
-    border: 1.5px solid {th['field_border']} !important;
-}}
-
-/* ===== Alerts ===== */
-.stAlert {{
-    border-radius: 14px !important;
-    font-family: 'Cairo', sans-serif !important;
-    border: none !important;
-}}
-
-/* ===== Headers ===== */
-h1, h2, h3, h4 {{
-    font-family: 'Cairo', sans-serif !important;
-    color: {th['text']} !important;
-}}
-
-/* ===== Dataframe ===== */
-div[data-testid="stDataFrame"] {{
-    border-radius: 14px;
-    overflow: hidden;
-    border: 1px solid {th['border']};
-}}
-
-/* ===== Expander ===== */
-div[data-testid="stExpander"] {{
-    border-radius: 14px !important;
-    border: 1px solid {th['border']} !important;
-    background: {th['card']} !important;
-    backdrop-filter: blur(10px);
-}}
-
-/* ===== Share Buttons ===== */
-.share-btn {{
-    display: block;
-    text-align: center;
-    padding: 12px 8px;
-    border-radius: 12px;
-    color: white !important;
-    font-weight: 700;
-    text-decoration: none !important;
-    transition: transform 0.2s;
-    font-size: 0.9rem;
-}}
-
-.share-btn:hover {{
-    transform: translateY(-2px);
-    color: white !important;
-}}
-
-/* ===== Empty State ===== */
-.empty-state {{
-    text-align: center;
-    padding: 24px;
-    color: {th['sub']};
-    background: {th['card']};
-    border-radius: 14px;
-    border: 1px dashed {th['field_border']};
-}}
-
-/* ===== PIN Box ===== */
-.pin-box {{
-    text-align: center;
-    padding: 30px 20px;
-    background: {th['card']};
-    border-radius: 20px;
-    margin: 20px 0;
-    border: 1px solid {th['border']};
-}}
-
-.pin-box h2 {{
-    margin: 0 0 8px;
-    font-size: 1.5rem;
-}}
-
-.pin-box p {{
-    color: {th['sub']};
-    margin: 0;
-}}
-
-/* ===== Tool Grid (Home) ===== */
-.tool-grid {{
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
-    gap: 10px;
-    margin: 12px 0;
-}}
-
-.tool-card {{
-    background: {th['card']};
-    backdrop-filter: blur(10px);
-    padding: 16px 14px;
-    border-radius: 16px;
-    border: 1px solid {th['border']};
-    transition: all 0.2s;
-    cursor: pointer;
-    text-align: center;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
-}}
-
-.tool-card:hover {{
-    transform: translateY(-3px);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.1);
-    border-color: {th['accent']};
-}}
-
-.tool-card-icon {{
-    font-size: 1.6rem;
-    margin-bottom: 6px;
-}}
-
-.tool-card-name {{
-    color: {th['text']};
-    font-size: 0.82rem;
-    font-weight: 600;
-    line-height: 1.3;
-}}
-
-/* ===== Divider ===== */
-hr {{
-    border-color: {th['border']} !important;
-    margin: 20px 0 !important;
-}}
-</style>
-""", unsafe_allow_html=True)
-
-
-st.markdown("""
-<link rel="manifest" href="./app/static/manifest.json">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="أدوات التاجر">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#4f46e5">
-""", unsafe_allow_html=True)
-
-if not check_pin():
-    st.stop()
-
-apply_theme(st.session_state.theme)
-
-st.sidebar.markdown(
-    '<div style="text-align:center; padding:16px 0 8px;">'
-    '<div style="font-size:2.5rem;">💼</div>'
-    '<div style="font-weight:800; font-size:1.05rem; margin-top:4px;">أدوات التاجر</div>'
-    '<div style="font-size:0.75rem; opacity:0.75;">الذكي</div>'
-    '</div>',
-    unsafe_allow_html=True,
-)
-
-search_query = st.sidebar.text_input(
-    "🔍",
-    value=st.session_state.search_query,
-    placeholder="ابحث عن أداة...",
-    label_visibility="collapsed",
-)
-st.session_state.search_query = search_query
-
-theme_options = ["☀️ فاتح", "🌙 داكن", "🌅 غروب", "🌊 محيط", "🌲 غابة"]
-theme_names = ["فاتح", "داكن", "غروب", "محيط", "غابة"]
-default_idx = 0
-for i, name in enumerate(theme_names):
-    if name == st.session_state.theme:
-        default_idx = i
-        break
-
-theme_pick = st.sidebar.selectbox("🎨 الثيم", theme_options, index=default_idx)
-theme_key = theme_pick.split()[-1]
-if theme_key != st.session_state.theme:
-    st.session_state.theme = theme_key
-    st.rerun()
-
-st.sidebar.markdown("---")
-
-ALL_TOOLS = [
-    "🏠 الرئيسية",
-    "📊 لوحة التقارير",
-    "📦 التجارة الإلكترونية",
-    "💳 تابي وتمارا",
-    "🏪 عمولة المنصات",
-    "📢 الإعلانات ROAS",
-    "💬 روابط واتساب",
-    "🏦 القروض والأقساط",
-    "💳 البطاقة الائتمانية",
-    "🕋 زكاة المال",
-    "💸 الرواتب",
-    "🛡️ نهاية الخدمة",
-    "👥 تكلفة الموظف",
-    "📅 الدوام الدقيقة",
-    "⚖️ توزيع الشحن",
-    "🏷️ الخصومات",
-    "🎁 العروض الترويجية",
-    "📦 نقطة إعادة الطلب",
-    "📈 نمو المبيعات",
-    "📊 LTV / CAC",
-    "⏳ حاسبة العمر",
-    "📉 نقطة التعادل",
-    "🧾 ضريبة VAT",
-    "📈 أرباح الكريبتو",
-    "🛡️ إدارة المخاطر",
-    "💱 محول العملات",
-    "🗓️ أيام العمل",
-    "📅 أرقام الفواتير",
-    "🔲 مولد QR",
-    "📄 القوالب الجاهزة",
-    "📜 سياسة الخصوصية",
-]
-
-if search_query.strip():
-    filtered = [x for x in ALL_TOOLS if search_query.lower().strip() in x.lower()]
-else:
-    filtered = ALL_TOOLS
-
-if not filtered:
-    st.sidebar.warning("لا توجد نتائج")
-    tool_choice = "🏠 الرئيسية"
-else:
-    tool_choice = st.sidebar.radio("الأدوات", filtered)
-
-if st.session_state.all_results:
-    st.sidebar.markdown(
-        f'<div style="text-align:center; padding:12px; background:rgba(255,255,255,0.1); '
-        f'border-radius:10px; margin-top:8px; font-size:0.8rem;">'
-        f'📊 {len(st.session_state.all_results)} عملية محفوظة</div>',
+    st.session_state.all_results.append(record)
+    st.toast("✅ تم الحفظ", icon="💾")
+
+
+def quick_save_button(key, tool_name, data_dict):
+    if st.button("💾 حفظ النتيجة", key=f"qsave_{key}", use_container_width=True):
+        save_result(tool_name, **data_dict)
+        st.rerun()
+
+
+def copy_box(text, label="📋 نسخ النتيجة"):
+    with st.expander(label):
+        st.code(text, language="")
+
+
+def share_buttons(text, title="نتيجتي"):
+    encoded = urllib.parse.quote(text)
+    wa = f"https://wa.me/?text={encoded}"
+    tw = f"https://twitter.com/intent/tweet?text={encoded}"
+    tg = f"https://t.me/share/url?url=&text={encoded}"
+
+    st.markdown(
+        '<p style="font-weight:700; margin-top:16px; color:#64748b;">📤 مشاركة النتيجة</p>',
+        unsafe_allow_html=True,
+    )
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown(
+            '<a href="' + wa + '" target="_blank" class="share-btn" '
+            'style="background:#25D366;">واتساب 💬</a>',
+            unsafe_allow_html=True,
+        )
+    with col2:
+        st.markdown(
+            '<a href="' + tw + '" target="_blank" class="share-btn" '
+            'style="background:#1DA1F2;">تويتر 🐦</a>',
+            unsafe_allow_html=True,
+        )
+    with col3:
+        st.markdown(
+            '<a href="' + tg + '" target="_blank" class="share-btn" '
+            'style="background:#0088cc;">تيليجرام ✈️</a>',
+            unsafe_allow_html=True,
+        )
+
+
+@st.cache_data(ttl=3600)
+def fetch_currency_rates():
+    fallback = {
+        "USD": 1.0, "SAR": 3.75, "AED": 3.67, "KWD": 0.31,
+        "OMR": 0.385, "EGP": 48.5, "EUR": 0.92, "GBP": 0.79,
+        "QAR": 3.64, "BHD": 0.376, "JOD": 0.71, "TRY": 34.5,
+        "CNY": 7.25, "JPY": 155.0, "INR": 84.0, "PKR": 278.0,
+    }
+    try:
+        import requests
+        r = requests.get("https://open.er-api.com/v6/latest/USD", timeout=8)
+        data = r.json()
+        if data.get("result") == "success":
+            rates = data.get("rates", {})
+            if rates:
+                return rates
+    except Exception:
+        pass
+    return fallback
+
+
+def export_to_excel(df_dict, filename="report.xlsx"):
+    try:
+        buffer = BytesIO()
+        with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+            for sheet_name, df in df_dict.items():
+                safe_name = str(sheet_name)
+                for ch in ["/", "\\", "?", "*", "[", "]", ":"]:
+                    safe_name = safe_name.replace(ch, "-")
+                safe_name = safe_name.strip()[:31]
+                if not safe_name:
+                    safe_name = "Sheet"
+                df.to_excel(writer, sheet_name=safe_name, index=False)
+        buffer.seek(0)
+        return buffer.getvalue()
+    except Exception as e:
+        st.error(f"خطأ في التصدير: {e}")
+        return None
+
+
+def page_header(icon, title, subtitle=""):
+    html = (
+        '<div class="page-hero">'
+        '<div class="page-hero-icon">' + icon + '</div>'
+        '<h1 class="page-title">' + title + '</h1>'
+    )
+    if subtitle:
+        html += '<p class="page-subtitle">' + subtitle + '</p>'
+    html += '</div>'
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def check_pin():
+    correct = ""
+    try:
+        correct = st.secrets.get("APP_PIN", "")
+    except Exception:
+        correct = ""
+
+    if not correct:
+        return True
+
+    if st.session_state.get("pin_ok"):
+        return True
+
+    st.markdown(
+        '<div class="pin-box">'
+        '<h2>🔐 التطبيق محمي</h2>'
+        '<p>أدخل رمز الدخول للمتابعة</p>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+    pin = st.text_input("الرمز:", type="password", key="pin_input")
+    if st.button("🚀 دخول", use_container_width=True):
+        if pin == correct:
+            st.session_state.pin_ok = True
+            st.rerun()
+        else:
+            st.error("❌ رمز خاطئ")
+    return False
+
+
+def render_reminders():
+    reminders = st.session_state.get("reminders", [])
+    today = datetime.date.today()
+
+    st.markdown(
+        '<h2 class="section-title">🔔 التنبيهات</h2>',
         unsafe_allow_html=True,
     )
 
+    with st.expander("➕ إضافة تنبيه جديد", expanded=False):
+        rtext = st.text_input("نص التنبيه:", key="rtext")
+        rdate = st.date_input(
+            "التاريخ:",
+            value=today + datetime.timedelta(days=7),
+            key="rdate",
+        )
+        if st.button("➕ إضافة", key="add_rem_btn", use_container_width=True):
+            if rtext.strip():
+                reminders.append({"text": rtext.strip(), "date": str(rdate)})
+                st.session_state.reminders = reminders
+                st.rerun()
+
+    if not reminders:
+        st.markdown(
+            '<div class="empty-state">لا توجد تنبيهات حالياً</div>',
+            unsafe_allow_html=True,
+        )
+        return
+
+    for r in sorted(reminders, key=lambda x: x["date"]):
+        try:
+            r_date = datetime.date.fromisoformat(r["date"])
+        except Exception:
+            continue
+        delta = (r_date - today).days
+        if delta < 0:
+            st.error(f"⚠️ متأخر! {r['text']} ({r['date']})")
+        elif delta == 0:
+            st.warning(f"⏰ اليوم! {r['text']}")
+        elif delta <= 7:
+            st.info(f"📅 {r['text']} — بعد {delta} يوم")
+    
 
 # ============================================================
 # 🏠 الرئيسية — تصميم جديد
@@ -1132,7 +770,6 @@ elif tool_choice == "🏦 القروض والأقساط":
             "الأشهر": months,
             "العملة": currency,
         })
-CURRENCIES = ["ر.س", "د.إ", "د.ك", "ر.ع", "ج.م", "$", "€", "£"]
 
 
 # ============================================================
