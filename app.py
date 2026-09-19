@@ -8,7 +8,7 @@ from helpers import (
     money, save_result, quick_save_button, copy_box,
     export_to_excel, page_header, share_buttons,
     fetch_currency_rates, currency_label,
-    t, check_pin, render_reminders,
+    check_pin, render_reminders,
 )
 
 try:
@@ -35,7 +35,6 @@ defaults = {
     "all_results": [],
     "theme": "فاتح",
     "search_query": "",
-    "lang": "ar",
     "reminders": [],
     "pin_ok": False,
 }
@@ -194,22 +193,11 @@ if not check_pin():
     st.stop()
 
 apply_theme(st.session_state.theme)
-lang = st.session_state.lang
 
 st.sidebar.markdown("### 💰 أدوات التاجر الذكي")
 
-lang_pick = st.sidebar.selectbox(
-    "🌐 اللغة / Language",
-    ["العربية", "English"],
-    index=0 if lang == "ar" else 1,
-)
-new_lang = "ar" if lang_pick == "العربية" else "en"
-if new_lang != st.session_state.lang:
-    st.session_state.lang = new_lang
-    st.rerun()
-
 search_query = st.sidebar.text_input(
-    t("search", lang),
+    "🔍 ابحث عن أداة",
     value=st.session_state.search_query,
     placeholder="مثال: زكاة، ضريبة...",
 )
@@ -223,7 +211,7 @@ for i, name in enumerate(theme_names):
         default_idx = i
         break
 
-theme_pick = st.sidebar.selectbox(t("theme", lang), theme_options, index=default_idx)
+theme_pick = st.sidebar.selectbox("🎨 الثيم", theme_options, index=default_idx)
 theme_key = theme_pick.split()[-1]
 if theme_key != st.session_state.theme:
     st.session_state.theme = theme_key
@@ -313,7 +301,7 @@ if tool_choice == "🏠 الرئيسية":
                 st.json(r)
 
     st.divider()
-    render_reminders(lang)
+    render_reminders()
 
 
 elif tool_choice == "📊 لوحة التقارير الموحدة":
@@ -344,7 +332,7 @@ elif tool_choice == "📊 لوحة التقارير الموحدة":
         st.line_chart(daily)
 
         st.divider()
-        st.subheader(t("monthly", lang))
+        st.subheader("📆 المقارنة الشهرية")
         df_all["الشهر"] = df_all["التاريخ"].str.slice(0, 7)
         monthly = df_all.groupby("الشهر").size()
         st.bar_chart(monthly)
@@ -356,9 +344,9 @@ elif tool_choice == "📊 لوحة التقارير الموحدة":
             pct = (diff / prev_m * 100) if prev_m > 0 else 0
 
             c1, c2, c3 = st.columns(3)
-            c1.metric(t("current_month", lang), current_m)
-            c2.metric(t("prev_month", lang), prev_m)
-            c3.metric(t("change", lang), f"{diff:+d}", delta=f"{pct:+.1f}%")
+            c1.metric("الشهر الحالي", current_m)
+            c2.metric("الشهر الماضي", prev_m)
+            c3.metric("التغيير", f"{diff:+d}", delta=f"{pct:+.1f}%")
 
         st.divider()
         st.subheader("🥧 توزيع الأدوات")
@@ -531,7 +519,7 @@ elif tool_choice == "🏪 عمولة المنصات (سلة/زد)":
     currency = st.selectbox("العملة", CURRENCIES, index=0)
     platform = st.selectbox("المنصة", ["سلة", "زد", "شوبيفاي", "مخصصة"])
 
-    defaults = {"سلة": (2.0, 2.5), "زد": (2.0, 2.5), "شوبيفاي": (2.9, 2.9), "مخصصة": (0.0, 0.0)}
+    platform_defaults = {"سلة": (2.0, 2.5), "زد": (2.0, 2.5), "شوبيفاي": (2.9, 2.9), "مخصصة": (0.0, 0.0)}
 
     price = st.number_input(f"السعر ({currency})", min_value=0.0, value=100.0, step=1.0)
     product_cost = st.number_input(f"تكلفة المنتج ({currency})", min_value=0.0, value=40.0, step=1.0)
@@ -539,9 +527,9 @@ elif tool_choice == "🏪 عمولة المنصات (سلة/زد)":
 
     col1, col2 = st.columns(2)
     with col1:
-        commission = st.number_input("عمولة المنصة (%)", min_value=0.0, value=defaults[platform][0], step=0.1)
+        commission = st.number_input("عمولة المنصة (%)", min_value=0.0, value=platform_defaults[platform][0], step=0.1)
     with col2:
-        payment = st.number_input("رسوم الدفع (%)", min_value=0.0, value=defaults[platform][1], step=0.1)
+        payment = st.number_input("رسوم الدفع (%)", min_value=0.0, value=platform_defaults[platform][1], step=0.1)
 
     payment_fixed = st.number_input(f"دفع ثابت ({currency})", min_value=0.0, value=1.0, step=0.5)
     vat = st.number_input("ضريبة (%)", min_value=0.0, value=15.0, step=1.0)
