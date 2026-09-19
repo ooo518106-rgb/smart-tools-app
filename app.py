@@ -8,6 +8,7 @@ from helpers import (
     money, save_result, quick_save_button, copy_box,
     export_to_excel, page_header, share_buttons,
     fetch_currency_rates, currency_label,
+    t, check_pin, render_reminders,
 )
 
 try:
@@ -34,6 +35,9 @@ defaults = {
     "all_results": [],
     "theme": "فاتح",
     "search_query": "",
+    "lang": "ar",
+    "reminders": [],
+    "pin_ok": False,
 }
 for k, v in defaults.items():
     if k not in st.session_state:
@@ -84,17 +88,17 @@ def apply_theme(theme_name):
         },
     }
 
-    t = themes.get(theme_name, themes["فاتح"])
+    th = themes.get(theme_name, themes["فاتح"])
 
     st.markdown(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
 html, body {{ font-family: 'Cairo', sans-serif; }}
-.stApp {{ background: {t['bg']}; }}
+.stApp {{ background: {th['bg']}; }}
 footer {{visibility: hidden;}}
 #MainMenu {{visibility: hidden;}}
 .main-title {{
-    background: linear-gradient(90deg, {t['sidebar1']} 0%, {t['accent']} 100%);
+    background: linear-gradient(90deg, {th['sidebar1']} 0%, {th['accent']} 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     font-size: 1.9rem;
@@ -105,28 +109,28 @@ footer {{visibility: hidden;}}
 }}
 .sub-title {{
     text-align: center;
-    color: {t['sub']};
+    color: {th['sub']};
     font-size: 0.9rem;
     margin-bottom: 1.5rem;
 }}
 [data-testid="stMetric"] {{
-    background: {t['card']};
+    background: {th['card']};
     padding: 14px 12px;
     border-radius: 12px;
-    border-right: 4px solid {t['accent']};
+    border-right: 4px solid {th['accent']};
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
 }}
 [data-testid="stMetricLabel"] {{
-    color: {t['sub']} !important;
+    color: {th['sub']} !important;
     font-size: 0.8rem !important;
     font-weight: 600 !important;
 }}
 [data-testid="stMetricValue"] {{
-    color: {t['text']} !important;
+    color: {th['text']} !important;
     font-weight: 700 !important;
 }}
 section[data-testid="stSidebar"] {{
-    background: linear-gradient(180deg, {t['sidebar1']} 0%, {t['sidebar2']} 100%);
+    background: linear-gradient(180deg, {th['sidebar1']} 0%, {th['sidebar2']} 100%);
 }}
 section[data-testid="stSidebar"] h1,
 section[data-testid="stSidebar"] h2,
@@ -145,7 +149,7 @@ section[data-testid="stSidebar"] .stRadio label {{
     display: block;
 }}
 .stButton > button {{
-    background: linear-gradient(90deg, {t['sidebar1']} 0%, {t['accent']} 100%);
+    background: linear-gradient(90deg, {th['sidebar1']} 0%, {th['accent']} 100%);
     color: white;
     border: none;
     border-radius: 10px;
@@ -164,25 +168,48 @@ section[data-testid="stSidebar"] .stRadio label {{
 }}
 .stTextInput input, .stNumberInput input, .stTextArea textarea {{
     border-radius: 10px !important;
-    border: 2px solid {t['field_border']} !important;
+    border: 2px solid {th['field_border']} !important;
     font-family: 'Cairo', sans-serif !important;
-    background: {t['field_bg']} !important;
-    color: {t['field_text']} !important;
+    background: {th['field_bg']} !important;
+    color: {th['field_text']} !important;
 }}
 h1, h2, h3 {{
     font-family: 'Cairo', sans-serif !important;
-    color: {t['text']} !important;
+    color: {th['text']} !important;
 }}
 </style>
 """, unsafe_allow_html=True)
 
 
+st.markdown("""
+<link rel="manifest" href="./app/static/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="أدوات التاجر">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2a5298">
+""", unsafe_allow_html=True)
+
+if not check_pin():
+    st.stop()
+
 apply_theme(st.session_state.theme)
+lang = st.session_state.lang
 
 st.sidebar.markdown("### 💰 أدوات التاجر الذكي")
 
+lang_pick = st.sidebar.selectbox(
+    "🌐 اللغة / Language",
+    ["العربية", "English"],
+    index=0 if lang == "ar" else 1,
+)
+new_lang = "ar" if lang_pick == "العربية" else "en"
+if new_lang != st.session_state.lang:
+    st.session_state.lang = new_lang
+    st.rerun()
+
 search_query = st.sidebar.text_input(
-    "🔍 ابحث عن أداة",
+    t("search", lang),
     value=st.session_state.search_query,
     placeholder="مثال: زكاة، ضريبة...",
 )
@@ -196,7 +223,7 @@ for i, name in enumerate(theme_names):
         default_idx = i
         break
 
-theme_pick = st.sidebar.selectbox("🎨 الثيم", theme_options, index=default_idx)
+theme_pick = st.sidebar.selectbox(t("theme", lang), theme_options, index=default_idx)
 theme_key = theme_pick.split()[-1]
 if theme_key != st.session_state.theme:
     st.session_state.theme = theme_key
@@ -239,7 +266,7 @@ ALL_TOOLS = [
 ]
 
 if search_query.strip():
-    filtered = [t for t in ALL_TOOLS if search_query.lower().strip() in t.lower()]
+    filtered = [x for x in ALL_TOOLS if search_query.lower().strip() in x.lower()]
 else:
     filtered = ALL_TOOLS
 
@@ -264,7 +291,7 @@ if tool_choice == "🏠 الرئيسية":
     c1, c2, c3 = st.columns(3)
     c1.metric("🛠️ عدد الأدوات", "30")
     c2.metric("📊 عمليات محفوظة", total_ops)
-    c3.metric("🌍 عملات مدعومة", "+160")
+    c3.metric("🌍 عملات متوفرة", "+160")
 
     st.divider()
 
@@ -284,6 +311,9 @@ if tool_choice == "🏠 الرئيسية":
         for r in recent:
             with st.expander(f"• {r.get('الأداة', 'عملية')} — {r.get('التاريخ', '')}"):
                 st.json(r)
+
+    st.divider()
+    render_reminders(lang)
 
 
 elif tool_choice == "📊 لوحة التقارير الموحدة":
@@ -312,6 +342,23 @@ elif tool_choice == "📊 لوحة التقارير الموحدة":
         df_all["اليوم"] = df_all["التاريخ"].str.split(" ").str[0]
         daily = df_all.groupby("اليوم").size()
         st.line_chart(daily)
+
+        st.divider()
+        st.subheader(t("monthly", lang))
+        df_all["الشهر"] = df_all["التاريخ"].str.slice(0, 7)
+        monthly = df_all.groupby("الشهر").size()
+        st.bar_chart(monthly)
+
+        if len(monthly) >= 2:
+            current_m = monthly.iloc[-1]
+            prev_m = monthly.iloc[-2]
+            diff = current_m - prev_m
+            pct = (diff / prev_m * 100) if prev_m > 0 else 0
+
+            c1, c2, c3 = st.columns(3)
+            c1.metric(t("current_month", lang), current_m)
+            c2.metric(t("prev_month", lang), prev_m)
+            c3.metric(t("change", lang), f"{diff:+d}", delta=f"{pct:+.1f}%")
 
         st.divider()
         st.subheader("🥧 توزيع الأدوات")
@@ -1000,8 +1047,12 @@ elif tool_choice == "⏳ حاسبة العمر":
     page_header("⏳", "حاسبة العمر")
 
     today = datetime.date.today()
-    dob = st.date_input("تاريخ الميلاد:", value=datetime.date(2000, 1, 1),
-                         min_value=datetime.date(1900, 1, 1), max_value=today)
+    dob = st.date_input(
+        "تاريخ الميلاد:",
+        value=datetime.date(2000, 1, 1),
+        min_value=datetime.date(1900, 1, 1),
+        max_value=today,
+    )
 
     if dob <= today:
         total_days = (today - dob).days
@@ -1252,8 +1303,12 @@ elif tool_choice == "📅 مولد أرقام الفواتير":
         nums = [f"{prefix}{sep}{year}{sep}{start_num + i:0{padding}d}" for i in range(count)]
         df = pd.DataFrame({"رقم الفاتورة": nums})
         st.dataframe(df, use_container_width=True, hide_index=True)
-        st.download_button("📥 تحميل", data=df.to_csv(index=False).encode("utf-8-sig"),
-                          file_name="invoice_numbers.csv", mime="text/csv")
+        st.download_button(
+            "📥 تحميل",
+            data=df.to_csv(index=False).encode("utf-8-sig"),
+            file_name="invoice_numbers.csv",
+            mime="text/csv",
+        )
 
 
 elif tool_choice == "🔲 مولد QR Code":
@@ -1273,7 +1328,12 @@ elif tool_choice == "🔲 مولد QR Code":
         elif not HAS_QR:
             st.error("مكتبة qrcode غير مثبتة.")
         else:
-            qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_H, box_size=10, border=2)
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_H,
+                box_size=10,
+                border=2,
+            )
             qr.add_data(content.strip())
             qr.make(fit=True)
             img = qr.make_image(fill_color=color, back_color="white")
@@ -1281,7 +1341,12 @@ elif tool_choice == "🔲 مولد QR Code":
             img.save(buf, format="PNG")
             buf.seek(0)
             st.image(buf, width=size)
-            st.download_button("📥 تحميل PNG", data=buf.getvalue(), file_name="qrcode.png", mime="image/png")
+            st.download_button(
+                "📥 تحميل PNG",
+                data=buf.getvalue(),
+                file_name="qrcode.png",
+                mime="image/png",
+            )
 
 
 elif tool_choice == "📄 القوالب الجاهزة":
