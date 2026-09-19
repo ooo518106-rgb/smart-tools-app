@@ -189,52 +189,6 @@ def page_header(icon, title, subtitle=""):
         )
 
 
-LANG = {
-    "ar": {
-        "search": "🔍 ابحث عن أداة",
-        "theme": "🎨 الثيم",
-        "lang": "🌐 اللغة",
-        "reminders": "🔔 التنبيهات",
-        "add_reminder": "➕ إضافة تنبيه",
-        "reminder_text": "نص التنبيه:",
-        "reminder_date": "التاريخ:",
-        "no_reminders": "لا توجد تنبيهات",
-        "overdue": "⚠️ متأخر!",
-        "today": "⏰ اليوم!",
-        "upcoming": "📅 قادم",
-        "monthly": "📆 المقارنة الشهرية",
-        "save": "💾 حفظ",
-        "delete": "🗑️ حذف",
-        "current_month": "الشهر الحالي",
-        "prev_month": "الشهر الماضي",
-        "change": "التغيير",
-    },
-    "en": {
-        "search": "🔍 Search tool",
-        "theme": "🎨 Theme",
-        "lang": "🌐 Language",
-        "reminders": "🔔 Reminders",
-        "add_reminder": "➕ Add Reminder",
-        "reminder_text": "Reminder text:",
-        "reminder_date": "Date:",
-        "no_reminders": "No reminders",
-        "overdue": "⚠️ Overdue!",
-        "today": "⏰ Today!",
-        "upcoming": "📅 Upcoming",
-        "monthly": "📆 Monthly Comparison",
-        "save": "💾 Save",
-        "delete": "🗑️ Delete",
-        "current_month": "Current Month",
-        "prev_month": "Previous Month",
-        "change": "Change",
-    },
-}
-
-
-def t(key, lang="ar"):
-    return LANG.get(lang, LANG["ar"]).get(key, key)
-
-
 def check_pin():
     correct = ""
     try:
@@ -265,26 +219,26 @@ def add_reminder(text, date):
     st.session_state.reminders = reminders
 
 
-def render_reminders(lang="ar"):
+def render_reminders():
     reminders = st.session_state.get("reminders", [])
     today = datetime.date.today()
 
-    st.subheader(t("reminders", lang))
+    st.subheader("🔔 التنبيهات")
 
-    with st.expander(t("add_reminder", lang), expanded=False):
-        rtext = st.text_input(t("reminder_text", lang), key="rtext")
+    with st.expander("➕ إضافة تنبيه", expanded=False):
+        rtext = st.text_input("نص التنبيه:", key="rtext")
         rdate = st.date_input(
-            t("reminder_date", lang),
+            "التاريخ:",
             value=today + datetime.timedelta(days=7),
             key="rdate",
         )
-        if st.button(t("add_reminder", lang), key="add_rem_btn"):
+        if st.button("➕ إضافة تنبيه", key="add_rem_btn"):
             if rtext.strip():
                 add_reminder(rtext.strip(), rdate)
                 st.rerun()
 
     if not reminders:
-        st.info(t("no_reminders", lang))
+        st.info("لا توجد تنبيهات")
         return
 
     for r in sorted(reminders, key=lambda x: x["date"]):
@@ -294,8 +248,8 @@ def render_reminders(lang="ar"):
             continue
         delta = (r_date - today).days
         if delta < 0:
-            st.error(f"{t('overdue', lang)} {r['text']} ({r['date']})")
+            st.error(f"⚠️ متأخر! {r['text']} ({r['date']})")
         elif delta == 0:
-            st.warning(f"{t('today', lang)} {r['text']}")
+            st.warning(f"⏰ اليوم! {r['text']}")
         elif delta <= 7:
-            st.info(f"{t('upcoming', lang)} ({delta} يوم): {r['text']} — {r['date']}")
+            st.info(f"📅 قادم ({delta} يوم): {r['text']} — {r['date']}")
