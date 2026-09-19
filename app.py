@@ -10,6 +10,7 @@ from helpers import (
     fetch_currency_rates, currency_label,
     check_pin, render_reminders,
     get_hijri_date, print_button,
+    pdf_download_button, quick_print,
 )
 
 try:
@@ -34,7 +35,7 @@ st.set_page_config(
 defaults = {
     "ecommerce_history": [],
     "all_results": [],
-    "theme": "فاتح",
+    "theme": "تلقائي",
     "search_query": "",
     "reminders": [],
     "pin_ok": False,
@@ -98,6 +99,13 @@ def apply_theme(theme_name):
         },
     }
 
+    if theme_name == "تلقائي":
+        try:
+            _hour = datetime.datetime.now().hour
+            theme_name = "داكن" if (_hour >= 19 or _hour < 6) else "فاتح"
+        except Exception:
+            theme_name = "فاتح"
+
     th = themes.get(theme_name, themes["فاتح"])
 
     st.markdown(f"""
@@ -110,7 +118,12 @@ footer {{visibility: hidden;}}
 #MainMenu {{visibility: hidden;}}
 [data-testid="stStatusWidget"] {{visibility: hidden;}}
 
-.page-hero {{ text-align: center; padding: 20px 10px 24px; margin-bottom: 12px; }}
+@keyframes fadeSlideIn {{
+    from {{ opacity: 0; transform: translateY(12px); }}
+    to {{ opacity: 1; transform: translateY(0); }}
+}}
+
+.page-hero {{ text-align: center; padding: 20px 10px 24px; margin-bottom: 12px; animation: fadeSlideIn 0.5s ease-out; }}
 .page-hero-icon {{ font-size: 3.2rem; margin-bottom: 8px; display: inline-block; }}
 .page-title {{
     background: linear-gradient(135deg, {th['sidebar1']} 0%, {th['accent2']} 100%);
@@ -147,6 +160,12 @@ footer {{visibility: hidden;}}
     border: 1px solid {th['border']};
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
     text-align: center;
+    animation: fadeSlideIn 0.5s ease-out;
+    transition: all 0.25s ease;
+}}
+.stat-card:hover {{
+    transform: translateY(-3px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
 }}
 .stat-icon {{ font-size: 1.8rem; margin-bottom: 6px; }}
 .stat-value {{
@@ -166,6 +185,12 @@ footer {{visibility: hidden;}}
     border-radius: 18px;
     border: 1px solid {th['border']};
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
+    animation: fadeSlideIn 0.4s ease-out;
+    transition: all 0.25s ease;
+}}
+[data-testid="stMetric"]:hover {{
+    transform: translateY(-3px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
 }}
 [data-testid="stMetricLabel"] {{
     color: {th['sub']} !important;
@@ -191,9 +216,11 @@ section[data-testid="stSidebar"] .stRadio label {{
     font-size: 0.88rem;
     font-weight: 500;
     border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.2s;
 }}
 section[data-testid="stSidebar"] .stRadio label:hover {{
     background: rgba(255, 255, 255, 0.18);
+    transform: translateX(-3px);
 }}
 section[data-testid="stSidebar"] input,
 section[data-testid="stSidebar"] textarea {{
@@ -212,7 +239,16 @@ section[data-testid="stSidebar"] textarea {{
     font-weight: 700;
     width: 100%;
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+    transition: all 0.2s;
+    animation: fadeSlideIn 0.3s ease-out;
 }}
+.stButton > button:hover {{
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+    color: white !important;
+}}
+.stButton > button:active {{ transform: scale(0.97); }}
+
 .stDownloadButton > button {{
     background: linear-gradient(135deg, #10b981 0%, #059669 100%);
     color: white !important;
@@ -221,6 +257,13 @@ section[data-testid="stSidebar"] textarea {{
     padding: 12px 20px;
     font-weight: 700;
     width: 100%;
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.25);
+    transition: all 0.2s;
+}}
+.stDownloadButton > button:hover {{
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(16, 185, 129, 0.35);
+    color: white !important;
 }}
 
 .stTextInput input, .stNumberInput input, .stTextArea textarea {{
@@ -229,6 +272,11 @@ section[data-testid="stSidebar"] textarea {{
     background: {th['field_bg']} !important;
     color: {th['field_text']} !important;
     padding: 10px 14px !important;
+    transition: all 0.2s;
+}}
+.stTextInput input:focus, .stNumberInput input:focus, .stTextArea textarea:focus {{
+    border-color: {th['accent']} !important;
+    box-shadow: 0 0 0 3px {th['border']} !important;
 }}
 .stSelectbox > div > div {{
     border-radius: 12px !important;
@@ -256,9 +304,21 @@ div[data-testid="stExpander"] {{
     font-weight: 700;
     text-decoration: none !important;
     font-size: 0.9rem;
+    transition: transform 0.2s;
 }}
-.share-btn:hover {{ color: white !important; }}
+.share-btn:hover {{
+    transform: translateY(-2px);
+    color: white !important;
+}}
 hr {{ border-color: {th['border']} !important; margin: 20px 0 !important; }}
+
+::-webkit-scrollbar {{ width: 8px; height: 8px; }}
+::-webkit-scrollbar-track {{ background: transparent; }}
+::-webkit-scrollbar-thumb {{
+    background: {th['accent']};
+    border-radius: 10px;
+}}
+::-webkit-scrollbar-thumb:hover {{ background: {th['accent2']}; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -285,8 +345,8 @@ search_query = st.sidebar.text_input(
 )
 st.session_state.search_query = search_query
 
-theme_options = ["☀️ فاتح", "🌙 داكن", "🌅 غروب", "🌊 محيط", "🌲 غابة"]
-theme_names = ["فاتح", "داكن", "غروب", "محيط", "غابة"]
+theme_options = ["🌗 تلقائي", "☀️ فاتح", "🌙 داكن", "🌅 غروب", "🌊 محيط", "🌲 غابة"]
+theme_names = ["تلقائي", "فاتح", "داكن", "غروب", "محيط", "غابة"]
 default_idx = 0
 for i, name in enumerate(theme_names):
     if name == st.session_state.theme:
@@ -551,7 +611,7 @@ elif tool_choice == "📊 لوحة التقارير":
                 st.session_state.ecommerce_history = []
                 st.toast("تم المسح", icon="🗑️")
                 st.rerun()
-                
+
 
 # ============================================================
 # 📦 التجارة الإلكترونية
@@ -590,6 +650,31 @@ elif tool_choice == "📦 التجارة الإلكترونية":
         f"الربح: {money(net_profit, currency)}\n"
         f"الهامش: {margin:.1f}%"
     )
+
+    st.markdown("**📤 تصدير النتائج:**")
+    exp_c1, exp_c2 = st.columns(2)
+    with exp_c1:
+        pdf_download_button(
+            "E-commerce Calculator",
+            [
+                ("Total Cost", money(total_cost, currency)),
+                ("Payment Fees", money(gateway_fees, currency)),
+                ("Selling Price", money(selling_price, currency)),
+                ("Net Profit", money(net_profit, currency)),
+                ("Margin", f"{margin:.1f}%"),
+            ],
+            filename="ecommerce_report.pdf",
+            key_suffix="ecom",
+        )
+    with exp_c2:
+        quick_print(
+            "حاسبة التجارة الإلكترونية",
+            "التكلفة: " + money(total_cost, currency) + "\n"
+            "الرسوم: " + money(gateway_fees, currency) + "\n"
+            "الربح: " + money(net_profit, currency) + "\n"
+            "الهامش: " + f"{margin:.1f}%"
+        )
+
     share_buttons(
         f"📦 نتيجة حاسبة التجارة:\n"
         f"الربح الصافي: {money(net_profit, currency)}\n"
@@ -648,6 +733,27 @@ elif tool_choice == "💳 تابي وتمارا":
     c1.metric("العمولة", money(fee_amount, currency))
     c2.metric("الضريبة", money(vat_amount, currency))
     c3.metric("الصافي", money(net, currency))
+
+    exp_c1, exp_c2 = st.columns(2)
+    with exp_c1:
+        pdf_download_button(
+            "Tabby & Tamara Fees",
+            [
+                ("Price", money(price, currency)),
+                ("Commission", money(fee_amount, currency)),
+                ("VAT", money(vat_amount, currency)),
+                ("Net to Merchant", money(net, currency)),
+            ],
+            filename="tabby_tamara.pdf",
+            key_suffix="tamara",
+        )
+    with exp_c2:
+        quick_print(
+            "رسوم تابي وتمارا",
+            "السعر: " + money(price, currency) + "\n"
+            "العمولة: " + money(fee_amount, currency) + "\n"
+            "الصافي: " + money(net, currency)
+        )
 
     share_buttons(f"💳 الصافي بعد تابي/تمارا: {money(net, currency)}\nمن تطبيق أدوات التاجر الذكي")
     quick_save_button("tamara", "تابي/تمارا", {
@@ -857,6 +963,25 @@ elif tool_choice == "🕋 زكاة المال":
         st.warning("⚠️ أقل من النصاب، لا زكاة.")
     else:
         st.metric("💰 مقدار الزكاة", money(zakat))
+
+        exp_c1, exp_c2 = st.columns(2)
+        with exp_c1:
+            pdf_download_button(
+                "Zakat Calculator",
+                [
+                    ("Total Wealth", money(wealth)),
+                    ("Zakat (2.5%)", money(zakat)),
+                ],
+                filename="zakat.pdf",
+                key_suffix="zakat",
+            )
+        with exp_c2:
+            quick_print(
+                "حاسبة الزكاة",
+                "إجمالي المال: " + money(wealth) + "\n"
+                "الزكاة: " + money(zakat)
+            )
+
         quick_save_button("zakat", "زكاة", {"المال": wealth, "الزكاة": round(zakat, 2)})
 
 
@@ -1525,7 +1650,7 @@ elif tool_choice == "🔐 مولد كلمات السر":
                 pw = "".join(secrets.choice(chars) for _ in range(length))
                 passwords.append(pw)
 
-            for i, pw in enumerate(passwords, 1):
+            for pw in passwords:
                 st.code(pw, language="")
 
             st.download_button(
