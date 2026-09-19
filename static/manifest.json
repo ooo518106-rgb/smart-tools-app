@@ -1,0 +1,11 @@
+{
+  "name": "أدوات التاجر الذكي",
+  "short_name": "التاجر",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f7fa",
+  "theme_color": "#2a5298",
+  "orientation": "portrait",
+  "lang": "ar",
+  "dir": "rtl"
+}
