@@ -5,3 +5,4 @@ qrcode[pil]
 openpyxl
 requests
 hijri-converter
+fpdf2
